@@ -1,2 +1,7 @@
 minipar
 build/
+.build/
+.cache
+
+compile_commands.json
+
