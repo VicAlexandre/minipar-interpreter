@@ -20,7 +20,7 @@ int Minipar::run_file(const std::string filename) {
   std::string line;
   std::string script;
   while (std::getline(script_file, line)) {
-    script += line + "\n";
+    script += line;
   }
 
   run(script);
@@ -35,6 +35,10 @@ int Minipar::run_file(const std::string filename) {
 int Minipar::run(const std::string script) {
   Scanner scanner(script);
   std::vector<Token> tokens = scanner.scan_tokens();
+
+  for (auto &token : tokens) {
+    std::cout << token.to_string() << std::endl;
+  }
 
   return 0;
 }
