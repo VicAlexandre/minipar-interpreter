@@ -1,6 +1,7 @@
 #include "core/Minipar.h"
 
 #include <iostream>
+#include <sysexits.h>
 
 int main(int argc, char *argv[]) {
   if (argc < 2 || argc > 2) {
@@ -12,13 +13,13 @@ int main(int argc, char *argv[]) {
     std::cerr << "*\t" << "Uso: " << argv[0] << " <script>" << std::endl;
     std::cerr << "*******************************************************"
               << std::endl;
-    exit(64);
+    exit(EX_USAGE);
   }
 
-  Minipar minipar = Minipar();
+  Minipar &minipar = Minipar::get_instance();
   if (minipar.run_file(argv[1]) != 0) {
     std::cerr << "Erro ao executar o script." << std::endl;
-    exit(64);
+    exit(EX_USAGE);
   }
 
   return 0;
