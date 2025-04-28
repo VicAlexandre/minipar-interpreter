@@ -1,6 +1,6 @@
 # Organização
 
-- [ ] Analisador Léxico [Victor <varm@ic.ufal.br>]
+- [x] Analisador Léxico [Victor <varm@ic.ufal.br>]
 - [ ] Analisador Sintático [Victor <varm@ic.ufal.br>]
 - [ ] Analisador Semântico [José Gomes <jgsj@ic.ufal.br>]
 - [ ] Runner [Renilson <renilson.123@hotmail.com>]
