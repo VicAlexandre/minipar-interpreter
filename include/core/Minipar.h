@@ -8,8 +8,10 @@
  */
 class Minipar {
 public:
-  Minipar();
-  ~Minipar();
+  static Minipar &get_instance() {
+    static Minipar instance;
+    return instance;
+  }
 
   /**
    * @brief Read and run the script file.
@@ -20,18 +22,7 @@ public:
    */
   int run_file(const std::string filename);
 
-private:
-  /*
-   * @brief Flag to indicate if there was an error during the execution.
-   */
-  bool has_error = false;
-
-  /*
-   * @brief Run a single line of the script.
-   */
-  int run(const std::string line);
-
-  /*
+  /**
    * @brief Report an error.
    *
    * @param msg The error message to be reported.
@@ -39,7 +30,30 @@ private:
    * @param line_number The line number where the error occurred.
    * @retval 0 if the error was reported successfully.
    */
-  int report_error(std::string msg, std::string where, int line_number);
+  static int report_error(std::string msg, std::string where, int line_number);
+
+  /**
+   * @brief Check if there was an error during the execution.
+   *
+   * @retval true if there was an error, false otherwise.
+   */
+  static bool faulted() { return get_instance().has_error; }
+
+private:
+  /* Minipar is implemented as a Singleton */
+  Minipar() {}
+  Minipar(const Minipar &) = delete;
+  Minipar &operator=(const Minipar &) = delete;
+
+  /*
+   * @brief Flag to indicate if there was an error during the execution.
+   */
+  bool has_error = false;
+
+  /*
+   * @brief Run the script.
+   */
+  int run(const std::string script);
 };
 
 #endif /* MINIPAR_H */
