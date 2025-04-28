@@ -1,0 +1,102 @@
+#include "enum/TokenType.h"
+#include <string>
+
+std::string to_str(TokenType type) {
+  switch (type) {
+  case TokenType::LEFT_PAREN:
+    return "(";
+  case TokenType::RIGHT_PAREN:
+    return ")";
+  case TokenType::LEFT_BRACE:
+    return "{";
+  case TokenType::RIGHT_BRACE:
+    return "}";
+  case TokenType::LEFT_BRACKET:
+    return "[";
+  case TokenType::RIGHT_BRACKET:
+    return "]";
+  case TokenType::COMMA:
+    return ",";
+  case TokenType::DOT:
+    return ".";
+  case TokenType::PLUS:
+    return "+";
+  case TokenType::MINUS:
+    return "-";
+  case TokenType::STAR:
+    return "*";
+  case TokenType::SLASH:
+    return "/";
+  case TokenType::PERCENT:
+    return "%";
+  case TokenType::COLON:
+    return ":";
+  case TokenType::ARROW:
+    return "->";
+
+  case TokenType::EQUAL_ASSIGN:
+    return "=";
+  case TokenType::EQUAL_COMPARE:
+    return "==";
+  case TokenType::BANG_EQUAL:
+    return "!=";
+  case TokenType::GREATER:
+    return ">";
+  case TokenType::GREATER_EQUAL:
+    return ">=";
+  case TokenType::LESS:
+    return "<";
+  case TokenType::LESS_EQUAL:
+    return "<=";
+  case TokenType::BANG:
+    return "!";
+  case TokenType::OR_OR:
+    return "||";
+  case TokenType::AND_AND:
+    return "&&";
+
+  case TokenType::IDENTIFIER:
+    return "IDENTIFIER";
+  case TokenType::NUMBER:
+    return "NUMBER";
+  case TokenType::STRING_LITERAL:
+    return "STRING_LITERAL";
+
+  case TokenType::SEQ:
+    return "SEQ";
+  case TokenType::PAR:
+    return "PAR";
+  case TokenType::IF:
+    return "IF";
+  case TokenType::ELSE:
+    return "ELSE";
+  case TokenType::WHILE:
+    return "WHILE";
+  case TokenType::RETURN:
+    return "RETURN";
+  case TokenType::BREAK:
+    return "BREAK";
+  case TokenType::CONTINUE:
+    return "CONTINUE";
+  case TokenType::FUNC:
+    return "FUNC";
+  case TokenType::S_CHANNEL:
+    return "S_CHANNEL";
+  case TokenType::C_CHANNEL:
+    return "C_CHANNEL";
+  case TokenType::TYPE_NUMBER:
+    return "TYPE_NUMBER";
+  case TokenType::TYPE_BOOL:
+    return "TYPE_BOOL";
+  case TokenType::TYPE_STRING:
+    return "TYPE_STRING";
+  case TokenType::TRUE_LITERAL:
+    return "TRUE_LITERAL";
+  case TokenType::FALSE_LITERAL:
+    return "FALSE_LITERAL";
+
+  case TokenType::END_OF_FILE:
+    return "END_OF_FILE";
+  }
+  return "UNKNOWN_TOKEN";
+}
