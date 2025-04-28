@@ -14,7 +14,7 @@ enum LiteralType {
 };
 
 /**
- * @brief The lexical analyzer class, also known as the scanner, for the Minipar
+ * @brief The lexical analyzer class, a.k.a. scanner, for the Minipar
  * interpreter.
  */
 class Scanner {
@@ -43,6 +43,12 @@ private:
   void add_token(TokenType type, ValueType literal, LiteralType lit);
 
   bool match_token(char expected);
+
+  void scan_string();
+
+  void scan_number();
+
+  void scan_identifier();
 };
 
 #endif /* SCANNER_H */
