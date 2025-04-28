@@ -1,13 +1,11 @@
 #include "core/Minipar.h"
+#include "core/Scanner.h"
+#include "core/Token.h"
 
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sysexits.h>
-
-Minipar::Minipar() {}
-
-Minipar::~Minipar() {}
 
 int Minipar::run_file(const std::string filename) {
   std::cout << "Executando o script " << filename << std::endl;
@@ -20,28 +18,36 @@ int Minipar::run_file(const std::string filename) {
   }
 
   std::string line;
+  std::string script;
   while (std::getline(script_file, line)) {
-    run(line);
+    script += line;
+  }
 
-    if (has_error) {
-      exit(EX_DATAERR);
-    }
+  run(script);
+
+  if (has_error) {
+    exit(EX_DATAERR);
   }
 
   return 0;
 }
 
-int Minipar::run(const std::string line) {
-  std::cout << "Executando a linha: " << line << std::endl;
+int Minipar::run(const std::string script) {
+  Scanner scanner(script);
+  std::vector<Token> tokens = scanner.scan_tokens();
+
+  for (auto &token : tokens) {
+    std::cout << token.to_string() << std::endl;
+  }
 
   return 0;
 }
 
 int Minipar::report_error(std::string msg, std::string where, int line_number) {
-  std::cerr << "[line " << line_number << "] Error" << where << ": " << msg
-            << std::endl;
+  std::cerr << "[Linha " << line_number << "] Erro: " << msg << " na posição "
+            << where << std::endl;
 
-  has_error = true;
+  get_instance().has_error = true;
 
   return 0;
 }
