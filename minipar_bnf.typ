@@ -44,10 +44,7 @@
 <params>          ::= <param> "," <params>
                     | <param>
 
-<param>           ::= ID ":" type <dflt>
-
-<dflt>            ::= "=" <disjunction>
-                    | ε
+<param>           ::= ID ":" type
 
 <if_stmt>         ::= "if" "(" <expression> ")" <block> <else_block>
 
@@ -62,10 +59,7 @@
 
 <par_stmt>       ::= "par" <block>
 
-<channel_stmt>   ::= <s_channel_stmt>
-                  | <c_channel_stmt>
-
-<c_channel_stmt> ::= "c_channel" ID "{" STRING "," NUMBER "}"
+<channel_stmt>   ::= "c_channel" ID "{" STRING "," NUMBER "}"
 
 <disjunction>    ::= <disjunction> "||" <conjunction>
                   | <conjunction>
