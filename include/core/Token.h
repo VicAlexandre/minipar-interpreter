@@ -42,9 +42,11 @@ public:
   ~Token() {}
 
   /* getters */
-  double getDouble() const { return std::get<double>(literal); }
-  bool getBool() const { return std::get<bool>(literal); }
-  std::string getString() const { return std::get<std::string>(literal); }
+  double get_double() const { return std::get<double>(literal); }
+  bool get_bool() const { return std::get<bool>(literal); }
+  std::string get_string() const { return std::get<std::string>(literal); }
+
+  TokenType get_type() const { return type; }
 
   std::string to_string();
 

@@ -1,5 +1,4 @@
-#ifndef SCANNER_H
-#define SCANNER_H
+#pragma once
 
 #include "core/Token.h"
 
@@ -50,5 +49,3 @@ private:
 
   void scan_identifier();
 };
-
-#endif /* SCANNER_H */

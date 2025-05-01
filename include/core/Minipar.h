@@ -1,5 +1,4 @@
-#ifndef MINIPAR_H
-#define MINIPAR_H
+#pragma once
 
 #include <string>
 
@@ -55,5 +54,3 @@ private:
    */
   int run(const std::string script);
 };
-
-#endif /* MINIPAR_H */
