@@ -1,5 +1,7 @@
 #include "core/Minipar.h"
+#include "core/Parser.h"
 #include "core/Scanner.h"
+#include "core/Stmt.h"
 #include "core/Token.h"
 
 #include <filesystem>
@@ -35,10 +37,16 @@ int Minipar::run_file(const std::string filename) {
 int Minipar::run(const std::string script) {
   Scanner scanner(script);
   std::vector<Token> tokens = scanner.scan_tokens();
+  Parser parser(tokens);
+  ParseResult parse_res = parser.parse();
 
-  for (auto &token : tokens) {
-    std::cout << token.to_string() << std::endl;
+  if (parse_res.syntax_errors.size() > 0) {
+    for (const auto &error : parse_res.syntax_errors) {
+      std::cerr << error->get_message() << std::endl;
+    }
+    return -1;
   }
+  /* continua com a semântica */
 
   return 0;
 }

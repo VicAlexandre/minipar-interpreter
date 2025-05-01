@@ -1,5 +1,6 @@
 #include "core/Minipar.h"
 
+#include <cstdlib>
 #include <iostream>
 #include <sysexits.h>
 
@@ -18,8 +19,7 @@ int main(int argc, char *argv[]) {
 
   Minipar &minipar = Minipar::get_instance();
   if (minipar.run_file(argv[1]) != 0) {
-    std::cerr << "Erro ao executar o script." << std::endl;
-    exit(EX_USAGE);
+    exit(EXIT_FAILURE);
   }
 
   return 0;

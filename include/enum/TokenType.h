@@ -49,7 +49,6 @@ enum class TokenType {
   BREAK,         /** break */
   CONTINUE,      /** continue */
   FUNC,          /** func */
-  S_CHANNEL,     /** s_channel */
   C_CHANNEL,     /** c_channel */
   TYPE_NUMBER,   /** number */
   TYPE_BOOL,     /** bool */

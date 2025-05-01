@@ -80,8 +80,6 @@ std::string to_str(TokenType type) {
     return "CONTINUE";
   case TokenType::FUNC:
     return "FUNC";
-  case TokenType::S_CHANNEL:
-    return "S_CHANNEL";
   case TokenType::C_CHANNEL:
     return "C_CHANNEL";
   case TokenType::TYPE_NUMBER:
