@@ -121,6 +121,46 @@ public:
     }
   }
 
+  StmtType get_type() { return type; }
+
+  DeclarationStmt &get_decl_stmt() { return std::get<DeclarationStmt>(node); }
+  AssignmentStmt &get_assign_stmt() { return std::get<AssignmentStmt>(node); }
+  ReturnStmt &get_return_stmt() { return std::get<ReturnStmt>(node); }
+  BreakStmt &get_break_stmt() { return std::get<BreakStmt>(node); }
+  ContinueStmt &get_continue_stmt() { return std::get<ContinueStmt>(node); }
+  BlockStmt &get_block_stmt() { return std::get<BlockStmt>(node); }
+  IfStmt &get_if_stmt() { return std::get<IfStmt>(node); }
+  WhileStmt &get_while_stmt() { return std::get<WhileStmt>(node); }
+  FunctionStmt &get_function_stmt() { return std::get<FunctionStmt>(node); }
+  SeqStmt &get_seq_stmt() { return std::get<SeqStmt>(node); }
+  ParStmt &get_par_stmt() { return std::get<ParStmt>(node); }
+  CChannelStmt &get_c_channel_stmt() { return std::get<CChannelStmt>(node); }
+
+  DeclarationStmt move_decl_stmt() {
+    return std::move(std::get<DeclarationStmt>(node));
+  }
+  AssignmentStmt move_assign_stmt() {
+    return std::move(std::get<AssignmentStmt>(node));
+  }
+  ReturnStmt move_return_stmt() {
+    return std::move(std::get<ReturnStmt>(node));
+  }
+  BreakStmt move_break_stmt() { return std::move(std::get<BreakStmt>(node)); }
+  ContinueStmt move_continue_stmt() {
+    return std::move(std::get<ContinueStmt>(node));
+  }
+  BlockStmt move_block_stmt() { return std::move(std::get<BlockStmt>(node)); }
+  IfStmt move_if_stmt() { return std::move(std::get<IfStmt>(node)); }
+  WhileStmt move_while_stmt() { return std::move(std::get<WhileStmt>(node)); }
+  FunctionStmt move_function_stmt() {
+    return std::move(std::get<FunctionStmt>(node));
+  }
+  SeqStmt move_seq_stmt() { return std::move(std::get<SeqStmt>(node)); }
+  ParStmt move_par_stmt() { return std::move(std::get<ParStmt>(node)); }
+  CChannelStmt move_c_channel_stmt() {
+    return std::move(std::get<CChannelStmt>(node));
+  }
+
 private:
   using Variant =
       std::variant<DeclarationStmt, AssignmentStmt, ReturnStmt, BreakStmt,

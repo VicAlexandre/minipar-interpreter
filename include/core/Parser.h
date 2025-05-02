@@ -47,6 +47,8 @@ private:
     return index >= tokens.size();
   }
 
+  void sync();
+  void rewind(int steps);
   Token consume();
   Token previous();
 
@@ -76,4 +78,6 @@ private:
   ExprResult parse_unary();
   ExprResult parse_primary();
   ExprResult parse_local();
+
+  StepResult parse_block();
 };

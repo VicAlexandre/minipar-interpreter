@@ -2,6 +2,7 @@
 #include "core/Stmt.h"
 
 #include <cassert>
+#include <iostream>
 
 /**
  * @brief If a parse error occurs, this macro will create a new StepResult
@@ -11,7 +12,12 @@
   {nullptr, std::make_unique<Error>(_msg, tokens[current].get_column(),        \
                                     tokens[current].get_line())};
 
-static inline void sync() {}
+void Parser::sync() {}
+
+void Parser::rewind(int steps) {
+  assert(steps > 0 && "Trying to rewind with steps <= 0");
+  current -= steps;
+}
 
 Token Parser::consume() {
   assert(!is_at_end() && "Trying to consume a token when at end");
@@ -26,6 +32,21 @@ Token Parser::previous() {
 TokenType Parser::peek() {
   assert(!is_at_end() && "Trying to peek a token when at end");
   return tokens[current].get_type();
+}
+
+StepResult Parser::parse_block() {
+  std::vector<StmtPtr> body = {};
+  std::vector<std::unique_ptr<Error>> syntax_errors = {};
+  while (!is_at_end() && (peek() != TokenType::RIGHT_BRACE)) {
+    StepResult result = parse_statement();
+    if (result.syntax_error) {
+      return result;
+    }
+
+    body.push_back(std::move(result.statement));
+  }
+
+  return {std::make_unique<Stmt>(BlockStmt{std::move(body)}), nullptr};
 }
 
 ParseResult Parser::parse() {
@@ -159,10 +180,6 @@ StepResult Parser::parse_function_stmt() {
     if (is_at_end()) {
       return PARSER_ERROR("Esperado ',' ou ')' após parâmetro");
     }
-
-    if (peek() == TokenType::COMMA) {
-      consume();
-    }
   }
 
   if (is_at_end() || peek() != TokenType::RIGHT_PAREN) {
@@ -187,14 +204,9 @@ StepResult Parser::parse_function_stmt() {
   }
   consume();
 
-  std::vector<StmtPtr> body = {};
-  while (!is_at_end() && (peek() != TokenType::RIGHT_BRACE)) {
-    StepResult result = parse_statement();
-    if (result.syntax_error) {
-      return result;
-    }
-
-    body.push_back(std::move(result.statement));
+  StepResult body_result = parse_block();
+  if (body_result.syntax_error) {
+    return body_result;
   }
 
   if (is_at_end() || peek() != TokenType::RIGHT_BRACE) {
@@ -202,7 +214,7 @@ StepResult Parser::parse_function_stmt() {
   }
   consume();
 
-  BlockStmt body_block{std::move(body)};
+  BlockStmt body_block{body_result.statement->move_block_stmt()};
   Params params{std::move(param_names), std::move(param_types)};
 
   return {std::make_unique<Stmt>(FunctionStmt{
@@ -210,7 +222,78 @@ StepResult Parser::parse_function_stmt() {
           nullptr};
 }
 
-StepResult Parser::parse_if_stmt() {};
+StepResult Parser::parse_if_stmt() {
+  StepResult else_body_result;
+  bool has_else_branch = false;
+
+  if (is_at_end() || (peek() != TokenType::LEFT_PAREN)) {
+    return PARSER_ERROR("Esperado '(' após 'if'");
+  }
+  consume();
+
+  ExprResult condition = parse_expression();
+  if (condition.syntax_error) {
+    return {nullptr, std::move(condition.syntax_error)};
+  }
+
+  if (is_at_end() || (peek() != TokenType::RIGHT_PAREN)) {
+    return PARSER_ERROR("Esperado ')' após condição");
+  }
+  consume();
+
+  if (is_at_end() || (peek() != TokenType::LEFT_BRACE)) {
+    return PARSER_ERROR("Esperado '{' após if");
+  }
+  consume();
+
+  if (is_at_end()) {
+    return PARSER_ERROR("Esperado corpo após if");
+  }
+
+  StepResult body_result = parse_block();
+  if (body_result.syntax_error) {
+    return body_result;
+  }
+
+  if (is_at_end() || peek() != TokenType::RIGHT_BRACE) {
+    return PARSER_ERROR("Esperado '}' após corpo do if");
+  }
+  consume();
+
+  if (peek() == TokenType::ELSE) {
+    consume();
+    has_else_branch = true;
+
+    if (is_at_end() || (peek() != TokenType::LEFT_BRACE)) {
+      return PARSER_ERROR("Esperado '{' após 'else'");
+    }
+    consume();
+
+    if (is_at_end()) {
+      return PARSER_ERROR("Esperado corpo após else");
+    }
+
+    else_body_result = parse_block();
+    if (else_body_result.syntax_error) {
+      return else_body_result;
+    }
+
+    if (is_at_end() || peek() != TokenType::RIGHT_BRACE) {
+      return PARSER_ERROR("Esperado '}' após corpo do else");
+    }
+    consume();
+  }
+
+  return {std::make_unique<Stmt>(
+              IfStmt{std::move(condition.expression),
+                     body_result.statement->move_block_stmt(),
+                     has_else_branch
+                         ? std::make_optional(
+                               else_body_result.statement->move_block_stmt())
+                         : std::nullopt,
+                     has_else_branch}),
+          nullptr};
+};
 
 StepResult Parser::parse_while_stmt() {};
 
@@ -405,9 +488,8 @@ ExprResult Parser::parse_primary() {
   }
 
   if (match(TokenType::IDENTIFIER)) {
-    if (peek() == TokenType::LEFT_PAREN) {
-      return parse_local();
-    }
+    rewind(1);
+    return parse_local();
   }
 
   if (match(TokenType::LEFT_PAREN)) {
