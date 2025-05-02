@@ -2,7 +2,6 @@
 #include "core/Stmt.h"
 
 #include <cassert>
-#include <iostream>
 
 /**
  * @brief If a parse error occurs, this macro will create a new StepResult
@@ -100,7 +99,7 @@ StepResult Parser::parse_statement() {
     if (lookahead_is_declaration()) {
       return parse_declaration_stmt();
     }
-    return parse_assignment_or_call();
+    return parse_assignment();
   }
 
   if (match(TokenType::RETURN)) {
@@ -295,13 +294,110 @@ StepResult Parser::parse_if_stmt() {
           nullptr};
 };
 
-StepResult Parser::parse_while_stmt() {};
+StepResult Parser::parse_while_stmt() {
+  if (is_at_end() || (peek() != TokenType::LEFT_PAREN)) {
+    return PARSER_ERROR("Esperado '(' após 'while'");
+  }
+  consume();
 
-StepResult Parser::parse_seq_stmt() {};
+  ExprResult condition = parse_expression();
+  if (condition.syntax_error) {
+    return {nullptr, std::move(condition.syntax_error)};
+  }
 
-StepResult Parser::parse_par_stmt() {};
+  if (is_at_end() || (peek() != TokenType::RIGHT_PAREN)) {
+    return PARSER_ERROR("Esperado ')' após condição");
+  }
+  consume();
 
-StepResult Parser::parse_c_channel_stmt() {};
+  if (is_at_end() || (peek() != TokenType::LEFT_BRACE)) {
+    return PARSER_ERROR("Esperado '{' após while");
+  }
+  consume();
+  StepResult body_result = parse_block();
+  if (body_result.syntax_error) {
+    return body_result;
+  }
+
+  if (is_at_end() || peek() != TokenType::RIGHT_BRACE) {
+    return PARSER_ERROR("Esperado '}' após corpo do while");
+  }
+  consume();
+
+  return {
+      std::make_unique<Stmt>(WhileStmt{
+          std::move(condition.expression),
+          body_result.statement->move_block_stmt(),
+      }),
+      nullptr,
+  };
+};
+
+StepResult Parser::parse_seq_stmt() {
+  if (is_at_end() || (peek() != TokenType::LEFT_BRACE)) {
+    return PARSER_ERROR("Esperado '{' após 'seq'");
+  }
+  consume();
+
+  StepResult body_result = parse_block();
+  if (body_result.syntax_error) {
+    return body_result;
+  }
+
+  if (is_at_end() || peek() != TokenType::RIGHT_BRACE) {
+    return PARSER_ERROR("Esperado '}' após corpo do seq");
+  }
+  consume();
+
+  return {
+      std::make_unique<Stmt>(SeqStmt{body_result.statement->move_block_stmt()}),
+      nullptr,
+  };
+};
+
+StepResult Parser::parse_par_stmt() {
+  if (is_at_end() || (peek() != TokenType::LEFT_BRACE)) {
+    return PARSER_ERROR("Esperado '{' após 'par'");
+  }
+  consume();
+
+  StepResult body_result = parse_block();
+  if (body_result.syntax_error) {
+    return body_result;
+  }
+
+  if (is_at_end() || peek() != TokenType::RIGHT_BRACE) {
+    return PARSER_ERROR("Esperado '}' após corpo do par");
+  }
+  consume();
+
+  return {
+      std::make_unique<Stmt>(ParStmt{body_result.statement->move_block_stmt()}),
+      nullptr,
+  };
+};
+
+StepResult Parser::parse_c_channel_stmt() {
+  if (is_at_end() || (peek() != TokenType::IDENTIFIER)) {
+    return PARSER_ERROR("Esperado identificador após 'c_channel'");
+  }
+  Token channel_name = consume();
+
+  if (is_at_end() || (peek() != TokenType::IDENTIFIER)) {
+    return PARSER_ERROR("Esperado identificador após 'c_channel'");
+  }
+  Token id_1 = consume();
+
+  if (is_at_end() || (peek() != TokenType::IDENTIFIER)) {
+    return PARSER_ERROR("Esperado identificador após 'c_channel'");
+  }
+  Token id_2 = consume();
+
+  return {
+      std::make_unique<Stmt>(CChannelStmt{channel_name, id_1, id_2}),
+      nullptr,
+  };
+};
 
 StepResult Parser::parse_declaration_stmt() {
   Token identifier = consume();
@@ -323,7 +419,32 @@ StepResult Parser::parse_declaration_stmt() {
           nullptr};
 };
 
-StepResult Parser::parse_assignment_or_call() {};
+StepResult Parser::parse_assignment() {
+  if (is_at_end()) {
+    return PARSER_ERROR("Esperado '=' após identificador");
+  }
+
+  Token identifier = consume();
+
+  if (peek() != TokenType::EQUAL_ASSIGN) {
+    return PARSER_ERROR("Esperado '=' após identificador");
+  }
+
+  consume(); /* consume '=' */
+
+  if (is_at_end()) {
+    return PARSER_ERROR("Esperado expressão após '='");
+  }
+
+  ExprResult expr = parse_expression();
+  if (expr.syntax_error) {
+    return {nullptr, std::move(expr.syntax_error)};
+  }
+
+  return {std::make_unique<Stmt>(
+              AssignmentStmt{previous(), std::move(expr.expression)}),
+          nullptr};
+};
 
 StepResult Parser::parse_return_stmt() {
   ExprResult expr = parse_expression();
