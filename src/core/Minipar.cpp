@@ -46,7 +46,6 @@ int Minipar::run(const std::string script) {
     }
     return -1;
   }
-  /* continua com a semântica */
 
   return 0;
 }
