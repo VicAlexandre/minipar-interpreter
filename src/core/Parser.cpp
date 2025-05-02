@@ -375,7 +375,9 @@ ExprResult Parser::parse_primary() {
   }
 
   if (match(TokenType::IDENTIFIER)) {
-    return {std::make_unique<VariableExpr>(previous()), nullptr};
+    if (peek() == TokenType::LEFT_PAREN) {
+      return parse_local();
+    }
   }
 
   if (match(TokenType::LEFT_PAREN)) {
@@ -384,16 +386,68 @@ ExprResult Parser::parse_primary() {
       return inner;
 
     if (!match(TokenType::RIGHT_PAREN)) {
-      return {nullptr, std::make_unique<Error>("Esperado ')' após expressão",
-                                               tokens[current].get_column(),
-                                               tokens[current].get_line())};
+      return PARSER_ERROR("Esperado ')' após expressão");
     }
 
     return {std::make_unique<GroupingExpr>(std::move(inner.expression)),
             nullptr};
   }
 
-  return {nullptr, std::make_unique<Error>("Token inesperado em expressão",
-                                           tokens[current].get_column(),
-                                           tokens[current].get_line())};
+  return PARSER_ERROR("Token inesperado em expressão");
+}
+
+ExprResult Parser::parse_local() {
+  if (!match(TokenType::IDENTIFIER)) {
+    return PARSER_ERROR("Esperado identificador no início de <local>");
+  }
+
+  ExprPtr expr = std::make_unique<VariableExpr>(previous());
+
+  while (true) {
+    if (match(TokenType::DOT)) {
+      if (!match(TokenType::IDENTIFIER)) {
+        return PARSER_ERROR("Esperado identificador após '.'");
+      }
+      expr = std::make_unique<GetExpr>(std::move(expr), previous());
+    } else if (match(TokenType::LEFT_BRACKET)) {
+      if (!match(TokenType::NUMBER)) {
+        return PARSER_ERROR("Esperado número como índice");
+      }
+      Token index = previous();
+
+      if (!match(TokenType::RIGHT_BRACKET)) {
+        return PARSER_ERROR("Esperado ']' após índice");
+      }
+
+      expr = std::make_unique<IndexExpr>(std::move(expr), tokens[current - 2],
+                                         index);
+
+    } else if (match(TokenType::LEFT_PAREN)) {
+      std::vector<ExprPtr> args;
+
+      if (!check(TokenType::RIGHT_PAREN)) {
+        while (true) {
+          ExprResult arg = parse_expression();
+          if (arg.syntax_error)
+            return arg;
+
+          args.push_back(std::move(arg.expression));
+
+          if (!match(TokenType::COMMA))
+            break;
+        }
+      }
+
+      if (!match(TokenType::RIGHT_PAREN)) {
+        return PARSER_ERROR("Esperado ')' após argumentos");
+      }
+
+      expr = std::make_unique<CallExpr>(std::move(expr), previous(),
+                                        std::move(args));
+    } else {
+      break;
+    }
+  }
+
+  return {std::move(expr), nullptr};
 }

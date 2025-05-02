@@ -75,4 +75,5 @@ private:
   ExprResult parse_term();
   ExprResult parse_unary();
   ExprResult parse_primary();
+  ExprResult parse_local();
 };
