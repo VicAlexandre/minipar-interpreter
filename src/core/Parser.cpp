@@ -25,7 +25,7 @@ Token Parser::previous() {
 
 TokenType Parser::peek() {
   assert(!is_at_end() && "Trying to peek a token when at end");
-  return peek();
+  return tokens[current].get_type();
 }
 
 ParseResult Parser::parse() {
@@ -33,6 +33,10 @@ ParseResult Parser::parse() {
   std::vector<std::unique_ptr<Error>> syntax_errors = {};
 
   while (!is_at_end()) {
+    if (match(TokenType::END_OF_FILE)) {
+      break;
+    }
+
     StepResult result = parse_statement();
     if (result.syntax_error) {
       syntax_errors.push_back(std::move(result.syntax_error));
@@ -138,7 +142,7 @@ StepResult Parser::parse_function_stmt() {
   if (is_at_end()) {
     return PARSER_ERROR("Esperado '(' após nome da função");
   }
-  current++;
+  consume();
 
   std::vector<Token> param_names = {};
   std::vector<Token> param_types = {};
@@ -176,19 +180,34 @@ StepResult Parser::parse_function_stmt() {
        peek() != TokenType::TYPE_STRING)) {
     return PARSER_ERROR("Esperado tipo de retorno após '->'");
   }
-  consume();
+  Token return_type = consume();
 
   if (is_at_end() || peek() != TokenType::LEFT_BRACE) {
     return PARSER_ERROR("Esperado '{' após tipo de retorno");
   }
   consume();
-  // todo: parse function body as a block
+
+  std::vector<StmtPtr> body = {};
+  while (!is_at_end() && (peek() != TokenType::RIGHT_BRACE)) {
+    StepResult result = parse_statement();
+    if (result.syntax_error) {
+      return result;
+    }
+
+    body.push_back(std::move(result.statement));
+  }
 
   if (is_at_end() || peek() != TokenType::RIGHT_BRACE) {
     return PARSER_ERROR("Esperado '}' após corpo da função");
   }
+  consume();
 
-  return PARSER_ERROR("Parsing não implementado");
+  BlockStmt body_block{std::move(body)};
+  Params params{std::move(param_names), std::move(param_types)};
+
+  return {std::make_unique<Stmt>(FunctionStmt{
+              function_name, params, return_type, std::move(body_block)}),
+          nullptr};
 }
 
 StepResult Parser::parse_if_stmt() {};
@@ -223,7 +242,15 @@ StepResult Parser::parse_declaration_stmt() {
 
 StepResult Parser::parse_assignment_or_call() {};
 
-StepResult Parser::parse_return_stmt() {};
+StepResult Parser::parse_return_stmt() {
+  ExprResult expr = parse_expression();
+  if (expr.syntax_error) {
+    return {nullptr, std::move(expr.syntax_error)};
+  }
+
+  return {std::make_unique<Stmt>(ReturnStmt{std::move(expr.expression)}),
+          nullptr};
+};
 
 StepResult Parser::parse_break_stmt() {};
 

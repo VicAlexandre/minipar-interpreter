@@ -9,7 +9,6 @@
 #include <vector>
 
 struct Stmt;
-struct Expr;
 using StmtPtr = std::shared_ptr<Stmt>;
 
 struct Params {
