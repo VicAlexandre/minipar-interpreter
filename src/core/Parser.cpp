@@ -1,4 +1,7 @@
 #include "core/Parser.h"
+#include "core/Stmt.h"
+
+#include <cassert>
 
 /**
  * @brief If a parse error occurs, this macro will create a new StepResult
@@ -10,19 +13,34 @@
 
 static inline void sync() {}
 
+Token Parser::consume() {
+  assert(!is_at_end() && "Trying to consume a token when at end");
+  return tokens[current++];
+}
+
+Token Parser::previous() {
+  assert(current > 0 && "Trying to get previous token when at start");
+  return tokens[current - 1];
+}
+
+TokenType Parser::peek() {
+  assert(!is_at_end() && "Trying to peek a token when at end");
+  return peek();
+}
+
 ParseResult Parser::parse() {
   std::vector<std::unique_ptr<Stmt>> statements = {};
   std::vector<std::unique_ptr<Error>> syntax_errors = {};
 
   while (!is_at_end()) {
-    StepResult statement = parse_statement();
-    if (statement.syntax_error) {
-      syntax_errors.push_back(std::move(statement.syntax_error));
+    StepResult result = parse_statement();
+    if (result.syntax_error) {
+      syntax_errors.push_back(std::move(result.syntax_error));
       sync();
       continue;
     }
 
-    statements.push_back(std::move(statement.statement));
+    statements.push_back(std::move(result.statement));
   }
 
   return {std::move(statements), std::move(syntax_errors)};
@@ -72,9 +90,7 @@ StepResult Parser::parse_statement() {
     return parse_continue_stmt();
   }
 
-  return {nullptr, std::make_unique<Error>("Esperado um comando ou expressão",
-                                           tokens[current].get_column(),
-                                           tokens[current].get_line())};
+  return PARSER_ERROR("Instrução inválida");
 }
 
 bool Parser::match(TokenType type) {
@@ -82,7 +98,7 @@ bool Parser::match(TokenType type) {
     return false;
   }
 
-  if (tokens[current].get_type() != type) {
+  if (peek() != type) {
     return false;
   }
 
@@ -109,15 +125,70 @@ bool Parser::check(TokenType type) {
     return false;
   }
 
-  return tokens[current].get_type() == type;
+  return peek() == type;
 }
 
 StepResult Parser::parse_function_stmt() {
   if (is_at_end()) {
-    return {nullptr, std::make_unique<Error>("Esperado o nome da função",
-                                             tokens[current].get_column(),
-                                             tokens[current].get_line())};
+    return PARSER_ERROR("Esperado nome da função após 'func'");
   }
+
+  Token function_name = consume();
+
+  if (is_at_end()) {
+    return PARSER_ERROR("Esperado '(' após nome da função");
+  }
+  current++;
+
+  std::vector<Token> param_names = {};
+  std::vector<Token> param_types = {};
+  while (!is_at_end() && (peek() == TokenType::IDENTIFIER)) {
+    param_names.push_back(consume());
+
+    if (is_at_end() || peek() != TokenType::COLON) {
+      return PARSER_ERROR("Esperado ':' após nome do parâmetro");
+    }
+    consume();
+
+    param_types.push_back(consume());
+
+    if (is_at_end()) {
+      return PARSER_ERROR("Esperado ',' ou ')' após parâmetro");
+    }
+
+    if (peek() == TokenType::COMMA) {
+      consume();
+    }
+  }
+
+  if (is_at_end() || peek() != TokenType::RIGHT_PAREN) {
+    return PARSER_ERROR("Esperado ')' após parâmetros");
+  }
+  consume();
+
+  if (is_at_end() || peek() != TokenType::ARROW) {
+    return PARSER_ERROR("Esperado '->' após ')'");
+  }
+  consume();
+
+  if (is_at_end() ||
+      (peek() != TokenType::TYPE_NUMBER && peek() != TokenType::TYPE_BOOL &&
+       peek() != TokenType::TYPE_STRING)) {
+    return PARSER_ERROR("Esperado tipo de retorno após '->'");
+  }
+  consume();
+
+  if (is_at_end() || peek() != TokenType::LEFT_BRACE) {
+    return PARSER_ERROR("Esperado '{' após tipo de retorno");
+  }
+  consume();
+  // todo: parse function body as a block
+
+  if (is_at_end() || peek() != TokenType::RIGHT_BRACE) {
+    return PARSER_ERROR("Esperado '}' após corpo da função");
+  }
+
+  return PARSER_ERROR("Parsing não implementado");
 }
 
 StepResult Parser::parse_if_stmt() {};
@@ -130,7 +201,25 @@ StepResult Parser::parse_par_stmt() {};
 
 StepResult Parser::parse_c_channel_stmt() {};
 
-StepResult Parser::parse_declaration_stmt() {};
+StepResult Parser::parse_declaration_stmt() {
+  Token identifier = consume();
+  consume(); /* consume ':' */
+
+  Token type = consume();
+  consume(); /* consume '=' */
+
+  if (is_at_end()) {
+    return PARSER_ERROR("Esperado expressão após '='");
+  }
+
+  ExprResult expr = parse_expression();
+  if (expr.syntax_error) {
+    return {nullptr, std::move(expr.syntax_error)};
+  }
+  return {std::make_unique<Stmt>(
+              DeclarationStmt{identifier, type, std::move(expr.expression)}),
+          nullptr};
+};
 
 StepResult Parser::parse_assignment_or_call() {};
 
@@ -140,4 +229,171 @@ StepResult Parser::parse_break_stmt() {};
 
 StepResult Parser::parse_continue_stmt() {};
 
-StepResult Parser::parse_expression_stmt() {};
+ExprResult Parser::parse_expression() { return parse_disjunction(); }
+
+ExprResult Parser::parse_disjunction() {
+  ExprResult left = parse_conjunction();
+  if (left.syntax_error)
+    return left;
+
+  while (match(TokenType::OR_OR)) {
+    Token op = previous();
+
+    ExprResult right = parse_conjunction();
+    if (right.syntax_error)
+      return right;
+
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
+  }
+
+  return left;
+}
+
+ExprResult Parser::parse_conjunction() {
+  ExprResult left = parse_equality();
+  if (left.syntax_error)
+    return left;
+
+  while (match(TokenType::AND_AND)) {
+    Token op = previous();
+
+    ExprResult right = parse_equality();
+    if (right.syntax_error)
+      return right;
+
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
+  }
+
+  return left;
+}
+
+ExprResult Parser::parse_equality() {
+  ExprResult left = parse_comparison();
+  if (left.syntax_error)
+    return left;
+
+  while (match(TokenType::BANG_EQUAL) || match(TokenType::EQUAL_COMPARE)) {
+    Token op = previous();
+
+    ExprResult right = parse_comparison();
+    if (right.syntax_error)
+      return right;
+
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
+  }
+
+  return left;
+}
+
+ExprResult Parser::parse_comparison() {
+  ExprResult left = parse_sum();
+  if (left.syntax_error)
+    return left;
+
+  while (match(TokenType::GREATER) || match(TokenType::GREATER_EQUAL) ||
+         match(TokenType::LESS) || match(TokenType::LESS_EQUAL)) {
+    Token op = previous();
+
+    ExprResult right = parse_sum();
+    if (right.syntax_error)
+      return right;
+
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
+  }
+
+  return left;
+}
+
+ExprResult Parser::parse_sum() {
+  ExprResult left = parse_term();
+  if (left.syntax_error)
+    return left;
+
+  while (match(TokenType::PLUS) || match(TokenType::MINUS)) {
+    Token op = previous();
+
+    ExprResult right = parse_term();
+    if (right.syntax_error)
+      return right;
+
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
+  }
+
+  return left;
+}
+
+ExprResult Parser::parse_term() {
+  ExprResult left = parse_unary();
+  if (left.syntax_error)
+    return left;
+
+  while (match(TokenType::STAR) || match(TokenType::SLASH) ||
+         match(TokenType::PERCENT)) {
+    Token op = previous();
+
+    ExprResult right = parse_unary();
+    if (right.syntax_error)
+      return right;
+
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
+  }
+
+  return left;
+}
+
+ExprResult Parser::parse_unary() {
+  if (match(TokenType::BANG) || match(TokenType::MINUS)) {
+    Token op = previous();
+    ExprResult right = parse_unary();
+    if (right.syntax_error)
+      return right;
+
+    return {std::make_unique<UnaryExpr>(op, std::move(right.expression)),
+            nullptr};
+  }
+
+  return parse_primary();
+}
+
+ExprResult Parser::parse_primary() {
+  if (match(TokenType::FALSE_LITERAL)) {
+    return {std::make_unique<LiteralExpr>(previous()), nullptr};
+  }
+
+  if (match(TokenType::TRUE_LITERAL)) {
+    return {std::make_unique<LiteralExpr>(previous()), nullptr};
+  }
+
+  if (match(TokenType::NUMBER) || match(TokenType::STRING_LITERAL)) {
+    return {std::make_unique<LiteralExpr>(previous()), nullptr};
+  }
+
+  if (match(TokenType::IDENTIFIER)) {
+    return {std::make_unique<VariableExpr>(previous()), nullptr};
+  }
+
+  if (match(TokenType::LEFT_PAREN)) {
+    ExprResult inner = parse_expression();
+    if (inner.syntax_error)
+      return inner;
+
+    if (!match(TokenType::RIGHT_PAREN)) {
+      return {nullptr, std::make_unique<Error>("Esperado ')' após expressão",
+                                               tokens[current].get_column(),
+                                               tokens[current].get_line())};
+    }
+
+    return {std::make_unique<GroupingExpr>(std::move(inner.expression)),
+            nullptr};
+  }
+
+  return {nullptr, std::make_unique<Error>("Token inesperado em expressão",
+                                           tokens[current].get_column(),
+                                           tokens[current].get_line())};
+}

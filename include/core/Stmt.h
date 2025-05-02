@@ -73,13 +73,15 @@ struct CChannelStmt {
   Token id_2;
 };
 
-struct Stmt {
+class Stmt {
+public:
+  template <typename T> Stmt(T stmt) : node(std::move(stmt)) {}
+
+private:
   using Variant =
       std::variant<DeclarationStmt, AssignmentStmt, ReturnStmt, BreakStmt,
                    ContinueStmt, BlockStmt, IfStmt, CChannelStmt, WhileStmt,
                    FunctionStmt, SeqStmt, ParStmt>;
 
   Variant node;
-
-  template <typename T> Stmt(T stmt) : node(std::move(stmt)) {}
 };
