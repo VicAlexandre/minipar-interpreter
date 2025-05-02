@@ -11,7 +11,46 @@
   {nullptr, std::make_unique<Error>(_msg, tokens[current].get_column(),        \
                                     tokens[current].get_line())};
 
-void Parser::sync() {}
+void Parser::sync() {
+  int brace_level = 0;
+  bool at_statement_start = true;
+
+  while (!is_at_end()) {
+    TokenType type = peek();
+
+    if (type == TokenType::LEFT_BRACE) {
+      brace_level++;
+      at_statement_start = true;
+    } else if (type == TokenType::RIGHT_BRACE) {
+      brace_level--;
+      if (brace_level < 0)
+        brace_level = 0;
+      at_statement_start = true;
+    }
+
+    if (brace_level == 0) {
+      if (at_statement_start &&
+          (type == TokenType::FUNC || type == TokenType::IF ||
+           type == TokenType::WHILE || type == TokenType::SEQ ||
+           type == TokenType::PAR || type == TokenType::C_CHANNEL ||
+           type == TokenType::RETURN || type == TokenType::BREAK ||
+           type == TokenType::CONTINUE || type == TokenType::IDENTIFIER)) {
+        return;
+      }
+
+      if (type == TokenType::RIGHT_BRACE) {
+        consume();
+        return;
+      }
+    }
+
+    at_statement_start = (type == TokenType::LEFT_BRACE) ||
+                         (brace_level == 0 && (type == TokenType::RIGHT_BRACE ||
+                                               type == TokenType::END_OF_FILE));
+
+    consume();
+  }
+}
 
 void Parser::rewind(int steps) {
   assert(steps > 0 && "Trying to rewind with steps <= 0");
