@@ -252,10 +252,13 @@ StepResult Parser::parse_return_stmt() {
           nullptr};
 };
 
-StepResult Parser::parse_break_stmt() {};
+StepResult Parser::parse_break_stmt() {
+  return {std::make_unique<Stmt>(BreakStmt{}), nullptr};
+};
 
-StepResult Parser::parse_continue_stmt() {};
-
+StepResult Parser::parse_continue_stmt() {
+  return {std::make_unique<Stmt>(ContinueStmt{}), nullptr};
+};
 ExprResult Parser::parse_expression() { return parse_disjunction(); }
 
 ExprResult Parser::parse_disjunction() {
