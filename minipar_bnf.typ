@@ -59,7 +59,7 @@
 
 <par_stmt>       ::= "par" <block>
 
-<channel_stmt>   ::= "c_channel" ID "{" STRING "," NUMBER "}"
+<channel_stmt>   ::= "c_channel" ID ID iD
 
 <disjunction>    ::= <disjunction> "||" <conjunction>
                   | <conjunction>
