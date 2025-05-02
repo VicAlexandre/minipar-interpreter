@@ -2,7 +2,6 @@
 #include "core/Minipar.h"
 #include "enum/TokenType.h"
 
-#include <iostream>
 #include <unordered_map>
 
 std::unordered_map<std::string, TokenType> keywords = {
@@ -15,7 +14,6 @@ std::unordered_map<std::string, TokenType> keywords = {
     {"break", TokenType::BREAK},
     {"continue", TokenType::CONTINUE},
     {"func", TokenType::FUNC},
-    {"s_channel", TokenType::S_CHANNEL},
     {"c_channel", TokenType::C_CHANNEL},
     {"number", TokenType::TYPE_NUMBER},
     {"bool", TokenType::TYPE_BOOL},
@@ -162,18 +160,22 @@ void Scanner::add_token(TokenType type) { add_token(type, "", NONE); }
 void Scanner::add_token(TokenType type, ValueType literal,
                         enum LiteralType lit) {
   std::string text = source.substr(start, current - start);
+  unsigned int column = (current - start);
+
   switch (lit) {
   case STRING:
-    tokens.push_back(Token(type, text, line, std::get<std::string>(literal)));
+    tokens.push_back(
+        Token(type, text, line, column, std::get<std::string>(literal)));
     break;
   case NUMBER:
-    tokens.push_back(Token(type, text, line, std::get<double>(literal)));
+    tokens.push_back(
+        Token(type, text, line, column, std::get<double>(literal)));
     break;
   case BOOL:
-    tokens.push_back(Token(type, text, line, std::get<bool>(literal)));
+    tokens.push_back(Token(type, text, line, column, std::get<bool>(literal)));
     break;
   case NONE:
-    tokens.push_back(Token(type, text, line));
+    tokens.push_back(Token(type, text, line, column));
     break;
   default:
     __builtin_unreachable();

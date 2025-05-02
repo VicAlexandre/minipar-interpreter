@@ -1,6 +1,4 @@
-
-#ifndef TOKEN_TYPE_H
-#define TOKEN_TYPE_H
+#pragma once
 
 #include <string>
 
@@ -51,7 +49,6 @@ enum class TokenType {
   BREAK,         /** break */
   CONTINUE,      /** continue */
   FUNC,          /** func */
-  S_CHANNEL,     /** s_channel */
   C_CHANNEL,     /** c_channel */
   TYPE_NUMBER,   /** number */
   TYPE_BOOL,     /** bool */
@@ -67,5 +64,3 @@ enum class TokenType {
  * @brief Converts a TokenType to its string representation.
  */
 std::string to_str(TokenType type);
-
-#endif /* TOKEN_TYPE_H */
