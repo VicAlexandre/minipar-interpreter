@@ -1,8 +1,8 @@
-#include "core/Minipar.h"
+#include "../include/core/Minipar.h"
 
 #include <cstdlib>
 #include <iostream>
-#include <sysexits.h>
+#include "../include/core/sysexits.h"
 
 int main(int argc, char *argv[]) {
   if (argc < 2 || argc > 2) {

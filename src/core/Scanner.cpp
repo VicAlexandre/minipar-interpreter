@@ -1,6 +1,6 @@
-#include "core/Scanner.h"
-#include "core/Minipar.h"
-#include "enum/TokenType.h"
+#include "../include/core/Scanner.h"
+#include "../include/core/Minipar.h"
+#include "../include/enum/TokenType.h"
 
 #include <unordered_map>
 

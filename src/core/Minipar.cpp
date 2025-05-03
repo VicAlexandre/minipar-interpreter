@@ -1,7 +1,8 @@
-#include "core/Minipar.h"
-#include "core/Parser.h"
-#include "core/Scanner.h"
-#include "core/Token.h"
+#include "../include/core/Minipar.h"
+#include "../include/core/Parser.h"
+#include "../include/core/Scanner.h"
+#include "../include/core/Token.h"
+#include "../include/core/Semantic.h"
 
 #include <filesystem>
 #include <fstream>
@@ -44,6 +45,16 @@ int Minipar::run(const std::string script) {
       std::cerr << error->get_message() << std::endl;
     }
     return -1;
+  }
+
+  Semantic analyzer(parse_res.statements);
+  auto semantic_errors = analyzer.analyze();
+  
+  if (semantic_errors.size() > 0) {
+      for (const auto& error : semantic_errors) {
+          std::cerr << error->get_message() << std::endl;
+      }
+      return -1;
   }
 
   return 0;

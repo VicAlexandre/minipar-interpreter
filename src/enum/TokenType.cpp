@@ -1,4 +1,4 @@
-#include "enum/TokenType.h"
+#include "../include/enum/TokenType.h"
 #include <string>
 
 std::string to_str(TokenType type) {

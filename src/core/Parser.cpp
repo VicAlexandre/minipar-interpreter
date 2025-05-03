@@ -1,5 +1,5 @@
-#include "core/Parser.h"
-#include "core/Stmt.h"
+#include "../include/core/Parser.h"
+#include "../include/core/Stmt.h"
 
 #include <cassert>
 
