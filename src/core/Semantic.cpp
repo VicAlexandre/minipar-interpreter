@@ -136,6 +136,7 @@ void SemanticAnalyzer::visit(Stmt* stmt) {
         case StmtType::FUNCTION: visit_function(stmt->get_function_stmt()); break;
         case StmtType::IF: visit_if(stmt->get_if_stmt()); break;
         case StmtType::WHILE: visit_while(stmt->get_while_stmt()); break;
+        case StmtType::FOR: visit_for(stmt->get_for_stmt()); break;
         case StmtType::SEQ: visit_seq(stmt->get_seq_stmt()); break;
         case StmtType::PAR: visit_par(stmt->get_par_stmt()); break;
         case StmtType::CCHANNEL: visit_cchannel(stmt->get_c_channel_stmt()); break;
@@ -242,7 +243,7 @@ void SemanticAnalyzer::visit_break([[maybe_unused]] const BreakStmt& brk) {
      while (temp_context.size() > 1) {
         Stmt* enclosing_stmt = temp_context.top();
         temp_context.pop();
-        if (enclosing_stmt && enclosing_stmt->get_type() == StmtType::WHILE) {
+        if (enclosing_stmt && (enclosing_stmt->get_type() == StmtType::WHILE || enclosing_stmt->get_type() == StmtType::FOR)) {
             in_loop = true;
             break;
         }
@@ -251,7 +252,7 @@ void SemanticAnalyzer::visit_break([[maybe_unused]] const BreakStmt& brk) {
          }
     }
     if (!in_loop) {
-         report_error("Statement 'break' encontrado fora de um loop ('while').", 0, 0);
+        report_error("Statement 'break' encontrado fora de um loop ('while' ou 'for').", 0, 0);
     }
 }
 
@@ -261,16 +262,16 @@ void SemanticAnalyzer::visit_continue([[maybe_unused]] const ContinueStmt& cont)
      while (temp_context.size() > 1) {
          Stmt* enclosing_stmt = temp_context.top();
          temp_context.pop();
-         if (enclosing_stmt && enclosing_stmt->get_type() == StmtType::WHILE) {
-             in_loop = true;
-             break;
-         }
+         if (enclosing_stmt && (enclosing_stmt->get_type() == StmtType::WHILE || enclosing_stmt->get_type() == StmtType::FOR)) {
+            in_loop = true;
+            break;
+        }
          if (enclosing_stmt && enclosing_stmt->get_type() == StmtType::FUNCTION) {
              break;
          }
      }
     if (!in_loop) {
-         report_error("Statement 'continue' encontrado fora de um loop ('while').", 0, 0);
+        report_error("Statement 'continue' encontrado fora de um loop ('while' ou 'for').", 0, 0);
     }
 }
 
@@ -370,6 +371,28 @@ void SemanticAnalyzer::visit_while(const WhileStmt& while_stmt) {
           return;
      }
     visit_block(while_stmt.body);
+}
+
+void SemanticAnalyzer::visit_for(const ForStmt& for_stmt) {
+    if (for_stmt.initializer) {
+        visit(for_stmt.initializer.get());
+    }
+
+    if (for_stmt.condition) {
+        Token cond_type = visit(for_stmt.condition.get());
+        if (cond_type.get_type() != TokenType::TYPE_NONE) { 
+            if (!is_boolean_type(cond_type)) {
+                report_error("A condição do 'for' deve ser do tipo 'bool', mas foi encontrado '" + 
+                              cond_type.get_lexeme() + "'.", get_expr_token(for_stmt.condition));
+            }
+        }
+    }
+
+    if (for_stmt.increment) {
+        visit(for_stmt.increment.get());
+    }
+
+    visit_block(for_stmt.body);
 }
 
 void SemanticAnalyzer::visit_seq(const SeqStmt& seq) {

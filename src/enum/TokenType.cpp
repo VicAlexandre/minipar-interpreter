@@ -31,6 +31,8 @@ std::string to_str(TokenType type) {
     return "%";
   case TokenType::COLON:
     return ":";
+  case TokenType::SEMICOLON: 
+    return ";";
   case TokenType::ARROW:
     return "->";
 
@@ -72,6 +74,8 @@ std::string to_str(TokenType type) {
     return "ELSE";
   case TokenType::WHILE:
     return "WHILE";
+  case TokenType::FOR: 
+    return "FOR";
   case TokenType::RETURN:
     return "RETURN";
   case TokenType::BREAK:

@@ -58,6 +58,7 @@ private:
   StepResult parse_function_stmt();
   StepResult parse_if_stmt();
   StepResult parse_while_stmt();
+  StepResult parse_for_stmt();
   StepResult parse_seq_stmt();
   StepResult parse_par_stmt();
   StepResult parse_c_channel_stmt();

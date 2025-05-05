@@ -13,6 +13,7 @@ std::unordered_map<std::string, TokenType> keywords = {
     {"if", TokenType::IF},
     {"else", TokenType::ELSE},
     {"while", TokenType::WHILE},
+    {"for", TokenType::FOR},
     {"return", TokenType::RETURN},
     {"break", TokenType::BREAK},
     {"continue", TokenType::CONTINUE},
@@ -99,6 +100,9 @@ void Scanner::scan_token() {
     break;
   case ':': 
     add_token(TokenType::COLON); 
+    break;
+  case ';': 
+    add_token(TokenType::SEMICOLON); 
     break;
   case '-': 
     add_token(match_token('>') ? TokenType::ARROW : TokenType::MINUS); 

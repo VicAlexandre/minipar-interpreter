@@ -87,6 +87,7 @@ private:
     void visit_function(const FunctionStmt& func);
     void visit_if(const IfStmt& if_stmt);
     void visit_while(const WhileStmt& while_stmt);
+    void visit_for(const ForStmt& for_stmt);
     void visit_seq(const SeqStmt& seq);
     void visit_par(const ParStmt& par);
     void visit_cchannel(const CChannelStmt& channel);

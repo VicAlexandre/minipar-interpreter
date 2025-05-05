@@ -20,6 +20,7 @@ enum class StmtType {
     BLOCK,
     IF,
     WHILE,
+    FOR,
     FUNCTION,
     SEQ,
     PAR,
@@ -70,6 +71,14 @@ struct WhileStmt {
     BlockStmt body;
 };
 
+struct ForStmt {
+    Token for_keyword;
+    std::unique_ptr<Stmt> initializer;
+    ExprPtr condition;
+    std::unique_ptr<Stmt> increment;
+    BlockStmt body;
+};
+
 struct FunctionStmt {
     Token name;
     Params params;
@@ -110,6 +119,8 @@ public:
             type = StmtType::IF;
         } else if constexpr (std::is_same_v<T, WhileStmt>) {
             type = StmtType::WHILE;
+        } else if constexpr (std::is_same_v<T, ForStmt>) { 
+            type = StmtType::FOR; 
         } else if constexpr (std::is_same_v<T, FunctionStmt>) {
             type = StmtType::FUNCTION;
         } else if constexpr (std::is_same_v<T, SeqStmt>) {
@@ -138,6 +149,8 @@ public:
                 return arg.condition->get_token();
             } else if constexpr (std::is_same_v<T, WhileStmt>) {
                 return arg.condition->get_token();
+            } else if constexpr (std::is_same_v<T, ForStmt>) { 
+                return arg.for_keyword;
             } else if constexpr (std::is_same_v<T, CChannelStmt>) {
                 return arg.identifier;
             }
@@ -156,6 +169,7 @@ public:
     BlockStmt& get_block_stmt() { return std::get<BlockStmt>(node); }
     IfStmt& get_if_stmt() { return std::get<IfStmt>(node); }
     WhileStmt& get_while_stmt() { return std::get<WhileStmt>(node); }
+    ForStmt& get_for_stmt() { return std::get<ForStmt>(node); }
     FunctionStmt& get_function_stmt() { return std::get<FunctionStmt>(node); }
     SeqStmt& get_seq_stmt() { return std::get<SeqStmt>(node); }
     ParStmt& get_par_stmt() { return std::get<ParStmt>(node); }
@@ -170,6 +184,7 @@ public:
     BlockStmt move_block_stmt() { return std::move(std::get<BlockStmt>(node)); }
     IfStmt move_if_stmt() { return std::move(std::get<IfStmt>(node)); }
     WhileStmt move_while_stmt() { return std::move(std::get<WhileStmt>(node)); }
+    ForStmt move_for_stmt() { return std::move(std::get<ForStmt>(node)); }
     FunctionStmt move_function_stmt() { return std::move(std::get<FunctionStmt>(node)); }
     SeqStmt move_seq_stmt() { return std::move(std::get<SeqStmt>(node)); }
     ParStmt move_par_stmt() { return std::move(std::get<ParStmt>(node)); }
@@ -179,7 +194,7 @@ private:
     using Variant =
         std::variant<DeclarationStmt, AssignmentStmt, ReturnStmt, BreakStmt,
                     ContinueStmt, BlockStmt, IfStmt, CChannelStmt, WhileStmt,
-                    FunctionStmt, SeqStmt, ParStmt>;
+                    ForStmt, FunctionStmt, SeqStmt, ParStmt>;
 
     StmtType type;
     Variant node;
