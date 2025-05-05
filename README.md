@@ -1,9 +1,9 @@
 # Organização
 
 - [x] Analisador Léxico [Victor <varm@ic.ufal.br>]
-- [ ] Analisador Sintático [Victor <varm@ic.ufal.br>]
-- [ ] Analisador Semântico [José Gomes <jgsj@ic.ufal.br>]
-- [ ] Runner [Renilson <renilson.123@hotmail.com>]
+- [x] Analisador Sintático [Victor <varm@ic.ufal.br>]
+- [x] Analisador Semântico [Renilson <renilson.123@hotmail.com>]
+- [ ] Runner [José Gomes <jgsj@ic.ufal.br>]
 - [ ] Relatório [Monique ]
 
 ## Como buildar e executar o projeto

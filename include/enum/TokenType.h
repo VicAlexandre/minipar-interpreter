@@ -58,6 +58,9 @@ enum class TokenType {
 
   /* Special */
   END_OF_FILE, /** End of file */
+
+  /* None */
+  TYPE_NONE,  /** Type none */
 };
 
 /**

@@ -1,0 +1,18 @@
+func saudacao(nome: string, formal: bool) -> string {
+  msg: string = ""
+  if (formal) {
+    msg = "Prezado(a) " + nome + "."
+  } else {
+    msg = "Oi " + nome + "!"
+  }
+  return msg
+}
+
+func principal() -> string {
+  nome_usuario: string = "Ana"
+  tratamento_formal: bool = false
+  mensagem: string = saudacao(nome_usuario, tratamento_formal)
+
+  mensagem = saudacao("Carlos", true)
+  return mensagem
+}

@@ -1,0 +1,9 @@
+func erro_nao_declarado() -> bool {
+  x = 10
+
+  y: number = z + 5
+
+  resultado: bool = funcao_inexistente()
+
+  return resultado
+}

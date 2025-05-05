@@ -2,7 +2,7 @@
 
 #include <cstdlib>
 #include <iostream>
-#include "../include/core/sysexits.h"
+#include "sysexits.h"
 
 int main(int argc, char *argv[]) {
   if (argc < 2 || argc > 2) {
@@ -21,6 +21,6 @@ int main(int argc, char *argv[]) {
   if (minipar.run_file(argv[1]) != 0) {
     exit(EXIT_FAILURE);
   }
-
+  
   return 0;
 }

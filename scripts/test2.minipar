@@ -1,0 +1,9 @@
+x: number = 10
+
+func calcular() -> number {
+  a: number = 10
+  b: number = 5 * (a - 8)
+  c: number = a + b / 2
+  a = c + 1
+  return a
+}

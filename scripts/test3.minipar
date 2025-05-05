@@ -1,0 +1,13 @@
+func verificar(idade: number) -> bool {
+  maior_de_idade: bool = false
+  limite: number = 18
+
+  if (idade >= limite) {
+    maior_de_idade = true
+  } else {
+    maior_de_idade = false
+  }
+
+  resultado_final: bool = maior_de_idade && !false
+  return resultado_final
+}

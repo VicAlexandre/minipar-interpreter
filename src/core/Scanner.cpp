@@ -3,6 +3,9 @@
 #include "../include/enum/TokenType.h"
 
 #include <unordered_map>
+#include <iostream>
+#include <string> 
+#include <stdexcept> 
 
 std::unordered_map<std::string, TokenType> keywords = {
     {"SEQ", TokenType::SEQ},
@@ -45,80 +48,85 @@ std::vector<Token> Scanner::scan_tokens() {
     }
   }
 
-  /* add EOF token after all tokens have been scanned */
-  add_token(TokenType::END_OF_FILE);
+  tokens.emplace_back(TokenType::END_OF_FILE, "",
+                      tokens.empty() ? 1 : tokens.back().get_line(),
+                      tokens.empty() ? 1 : tokens.back().get_column() + tokens.back().get_lexeme().length());
 
   return tokens;
 }
 
 void Scanner::scan_token() {
-  /* scan the next token */
   char c = source[current];
-  int current_pos_in_line = current - start;
+  unsigned int current_col_guess = current - start + 1;
   current++;
 
   switch (c) {
-  case '(':
-    add_token(TokenType::LEFT_PAREN);
+  case '(': 
+    add_token(TokenType::LEFT_PAREN); 
     break;
-  case ')':
-    add_token(TokenType::RIGHT_PAREN);
+  case ')': 
+    add_token(TokenType::RIGHT_PAREN); 
     break;
-  case '{':
-    add_token(TokenType::LEFT_BRACE);
+  case '{': 
+    add_token(TokenType::LEFT_BRACE); 
     break;
-  case '}':
-    add_token(TokenType::RIGHT_BRACE);
+  case '}': 
+    add_token(TokenType::RIGHT_BRACE); 
     break;
-  case '[':
-    add_token(TokenType::LEFT_BRACKET);
+  case '[': 
+    add_token(TokenType::LEFT_BRACKET); 
     break;
-  case ']':
-    add_token(TokenType::RIGHT_BRACKET);
+  case ']': 
+    add_token(TokenType::RIGHT_BRACKET); 
     break;
-  case ',':
-    add_token(TokenType::COMMA);
+  case ',': 
+    add_token(TokenType::COMMA); 
     break;
-  case '.':
-    add_token(TokenType::DOT);
+  case '.': 
+    add_token(TokenType::DOT); 
     break;
-  case '+':
-    add_token(TokenType::PLUS);
+  case '+': 
+    add_token(TokenType::PLUS); 
     break;
-  case '*':
-    add_token(TokenType::STAR);
+  case '*': 
+    add_token(TokenType::STAR); 
     break;
-  case '/':
-    add_token(TokenType::SLASH);
+  case '/': 
+    add_token(TokenType::SLASH); 
     break;
-  case '%':
-    add_token(TokenType::PERCENT);
+  case '%': 
+    add_token(TokenType::PERCENT); 
     break;
-  case ':':
-    add_token(TokenType::COLON);
+  case ':': 
+    add_token(TokenType::COLON); 
     break;
-  case '-':
-    add_token(match_token('>') ? TokenType::ARROW : TokenType::MINUS);
+  case '-': 
+    add_token(match_token('>') ? TokenType::ARROW : TokenType::MINUS); 
     break;
-  case '=':
-    add_token(match_token('=') ? TokenType::EQUAL_COMPARE
-                               : TokenType::EQUAL_ASSIGN);
+  case '=': 
+    add_token(match_token('=') ? TokenType::EQUAL_COMPARE : TokenType::EQUAL_ASSIGN);
     break;
-  case '!':
-    add_token(match_token('=') ? TokenType::BANG_EQUAL : TokenType::BANG);
+  case '!': 
+    add_token(match_token('=') ? TokenType::BANG_EQUAL : TokenType::BANG); 
     break;
-  case '>':
-    add_token(match_token('=') ? TokenType::GREATER_EQUAL : TokenType::GREATER);
-    break;
-  case '<':
-    add_token(match_token('=') ? TokenType::LESS_EQUAL : TokenType::LESS);
+  case '>': 
+    add_token(match_token('=') ? TokenType::GREATER_EQUAL : TokenType::GREATER); break;
+  case '<': 
+    add_token(match_token('=') ? TokenType::LESS_EQUAL : TokenType::LESS); 
     break;
   case '|':
     if (match_token('|')) {
       add_token(TokenType::OR_OR);
     } else {
-      std::string pos_str = std::to_string(current_pos_in_line);
-      Minipar::report_error("Esperado '|'", pos_str, line);
+      Minipar::report_error("Caractere '|' inesperado. Esperado '||' para operador OR.", std::to_string(current_col_guess), line);
+      return;
+    }
+    break;
+   case '&':
+    if (match_token('&')) {
+      add_token(TokenType::AND_AND);
+    } else {
+      Minipar::report_error("Caractere '&' inesperado. Esperado '&&' para operador AND.", std::to_string(current_col_guess), line);
       return;
     }
     break;
@@ -137,48 +145,50 @@ void Scanner::scan_token() {
   case '\r':
   case '\t':
     break;
+
   case '\n':
-    line++;
+    line++; 
     break;
+
   default:
     if (is_digit(c)) {
       scan_number();
     } else if (is_alpha(c)) {
       scan_identifier();
     } else {
-      std::string pos_str = std::to_string(current_pos_in_line);
-      printf("caracter invalido: %2x\n", c);
-      Minipar::report_error("Caractere inválido", pos_str, line);
+      std::string msg = "Caractere inválido: '";
+      msg += c;
+      msg += "'";
+      Minipar::report_error(msg, std::to_string(current_col_guess), line);
       return;
     }
     break;
   }
 }
 
-void Scanner::add_token(TokenType type) { add_token(type, "", NONE); }
+void Scanner::add_token(TokenType type) {
+    add_token(type, ValueType{}, NONE);
+}
 
-void Scanner::add_token(TokenType type, ValueType literal,
-                        enum LiteralType lit) {
+void Scanner::add_token(TokenType type, ValueType literal, enum LiteralType lit) {
   std::string text = source.substr(start, current - start);
-  unsigned int column = (current - start);
-
+  unsigned int column_approx = start + 1;
   switch (lit) {
   case STRING:
-    tokens.push_back(
-        Token(type, text, line, column, std::get<std::string>(literal)));
+    tokens.emplace_back(type, text, line, column_approx, std::get<std::string>(literal));
     break;
   case NUMBER:
-    tokens.push_back(
-        Token(type, text, line, column, std::get<double>(literal)));
+    tokens.emplace_back(type, text, line, column_approx, std::get<double>(literal));
     break;
   case BOOL:
-    tokens.push_back(Token(type, text, line, column, std::get<bool>(literal)));
+    tokens.emplace_back(type, text, line, column_approx, std::get<bool>(literal));
     break;
   case NONE:
-    tokens.push_back(Token(type, text, line, column));
+    tokens.emplace_back(type, text, line, column_approx);
     break;
   default:
-    __builtin_unreachable();
+    Minipar::report_error("Tipo literal desconhecido em add_token (erro interno)", std::to_string(column_approx), line);
+    break;
   }
 }
 
@@ -189,28 +199,27 @@ bool Scanner::match_token(char expected) {
   if (source[current] != expected) {
     return false;
   }
-
   current++;
   return true;
 }
 
 void Scanner::scan_string() {
-  std::string str = "";
+  std::string str_value = ""; 
   while (current < source.size() && source[current] != '"') {
     if (source[current] == '\n') {
       line++;
     }
-    str += source[current];
+    str_value += source[current];
     current++;
   }
 
   if (current >= source.size()) {
-    Minipar::report_error("Esperado '\"'", std::to_string(current), line);
+    Minipar::report_error("String não terminada. Esperado '\"'", std::to_string(start + 1), line);
     return;
   }
 
   current++;
-  add_token(TokenType::STRING_LITERAL, str, STRING);
+  add_token(TokenType::STRING_LITERAL, str_value, STRING);
 }
 
 void Scanner::scan_number() {
@@ -219,27 +228,46 @@ void Scanner::scan_number() {
   }
 
   if (current < source.size() && source[current] == '.') {
-    current++;
-    while (current < source.size() && is_digit(source[current])) {
-      current++;
-    }
+      if (current + 1 < source.size() && is_digit(source[current + 1])) {
+          current++;
+          while (current < source.size() && is_digit(source[current])) {
+              current++;
+          }
+      }
   }
 
   std::string num_str = source.substr(start, current - start);
-  double number = std::stod(num_str);
-  add_token(TokenType::NUMBER, number, NUMBER);
+  try {
+      double number = std::stod(num_str);
+      add_token(TokenType::NUMBER, number, NUMBER);
+  } catch (const std::invalid_argument& ia) {
+      Minipar::report_error("Número inválido: '" + num_str + "'", std::to_string(start + 1), line);
+  } catch (const std::out_of_range& oor) {
+      Minipar::report_error("Número fora do intervalo representável: '" + num_str + "'", std::to_string(start + 1), line);
+  }
 }
 
 void Scanner::scan_identifier() {
   while (current < source.size() && is_alpha_numeric(source[current])) {
     current++;
   }
-
   std::string text = source.substr(start, current - start);
 
-  TokenType type = keywords.find(text) != keywords.end()
-                       ? keywords[text]
-                       : TokenType::IDENTIFIER;
+  TokenType type;
+  auto keyword_it = keywords.find(text);
+  if (keyword_it != keywords.end()) {
+    type = keyword_it->second;
 
-  add_token(type);
+    if (type == TokenType::TRUE_LITERAL) {
+      add_token(type, true, BOOL);
+    } else if (type == TokenType::FALSE_LITERAL) {
+      add_token(type, false, BOOL); 
+    } else {
+      add_token(type);
+    }
+
+  } else {
+    type = TokenType::IDENTIFIER;
+    add_token(type);
+  }
 }

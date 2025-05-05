@@ -1,0 +1,18 @@
+func erro_contexto() -> number {
+  return 5
+
+  if (true) {
+    return 10
+  }
+
+  break
+
+  while(false) {
+     continue
+  }
+
+  continue
+
+}
+
+return 100

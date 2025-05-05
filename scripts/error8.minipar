@@ -1,0 +1,12 @@
+func teste_erros_combinados(val: number) -> string {
+    x: number = 10
+    x: bool = true 
+
+    if (val == "10") {  
+        y: number = z 
+    }
+
+    res: string = minha_func(x) 
+
+    return x 
+}

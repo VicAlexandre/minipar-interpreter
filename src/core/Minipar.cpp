@@ -47,15 +47,15 @@ int Minipar::run(const std::string script) {
     return -1;
   }
 
-  Semantic analyzer(parse_res.statements);
-  auto semantic_errors = analyzer.analyze();
+  SemanticAnalyzer semantic;
+  auto semanticErrors = semantic.analyze(parse_res.statements);
   
-  if (semantic_errors.size() > 0) {
-      for (const auto& error : semantic_errors) {
+  if (!semanticErrors.empty()) {
+      for (const auto& error : semanticErrors) {
           std::cerr << error->get_message() << std::endl;
       }
-      return -1;
-  }
+      return EXIT_FAILURE;
+  }  
 
   return 0;
 }

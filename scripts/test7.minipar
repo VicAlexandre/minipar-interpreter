@@ -1,0 +1,13 @@
+func add(a: number, b: number) -> number {
+    return a + b
+}
+
+func mult(a: number, b: number) -> number {
+    return a * b
+}
+
+func teste_aninhado() -> number {
+  resultado: number = mult(add(1, 2), add(3, 4))
+
+  return resultado
+}

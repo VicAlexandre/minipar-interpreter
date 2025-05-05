@@ -1,0 +1,31 @@
+func calcula_imposto(salario: number) -> number {
+  taxa: number = 0.15
+  if (salario > 5000) {
+     taxa = 0.25
+  }
+  imposto_calculado: number = salario * taxa
+  return imposto_calculado
+}
+
+func calcula_bonus(anos_servico: number) -> number {
+   bonus_base: number = 100
+   if (anos_servico > 5) {
+      bonus_extra: number = anos_servico * 50
+      return bonus_base + bonus_extra
+   }
+   return bonus_base
+}
+
+func calcula_salario_liquido(salario_bruto: number, anos: number) -> number {
+   imposto: number = calcula_imposto(salario_bruto)
+   bonus: number = calcula_bonus(anos)
+
+   salario_liquido: number = salario_bruto - imposto + bonus
+
+   if (salario_liquido > 0) {
+      ajuste: number = 1.0
+      salario_liquido = salario_liquido * ajuste
+   }
+
+   return salario_liquido
+}

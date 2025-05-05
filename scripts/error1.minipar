@@ -1,0 +1,13 @@
+func erro_tipo() -> number {
+  a: number = "texto"
+  b: bool = 5 + 3
+  c: number = a
+
+  resultado: string = c
+
+  if (a) {
+     resultado = "passou"
+  }
+
+  return resultado 
+}

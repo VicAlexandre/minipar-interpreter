@@ -1,0 +1,18 @@
+func fibonacci(n: number) -> number {
+  if (n <= 0) {
+    return 0
+  } else {
+    if (n == 1) {
+      return 1
+    } else {
+      fib_n1: number = fibonacci(n - 1)
+      fib_n2: number = fibonacci(n - 2)
+      return fib_n1 + fib_n2
+    }
+  }
+}
+
+func teste_fibonacci() -> number {
+  resultado: number = fibonacci(10)
+  return resultado
+}

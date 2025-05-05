@@ -1,0 +1,11 @@
+func erro_redeclaracao() -> number {
+  contador: number = 0
+  contador: string = "abc"
+
+  if (true) {
+    escopo_interno: bool = true
+    escopo_interno: number = 1
+  }
+
+  return 0
+}

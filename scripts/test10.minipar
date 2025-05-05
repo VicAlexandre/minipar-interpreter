@@ -1,0 +1,32 @@
+func processa_dados(limite: number) -> string {
+   contador: number = 0
+   status: string = "Iniciando"
+   processado_com_sucesso: bool = true
+
+   while ((contador < limite) && (status != "Erro" || processado_com_sucesso)) {
+      contador = contador + 1
+      item_valido: bool = (contador % 2 == 0)
+
+      if (item_valido) {
+         status = "Processado item par"
+         if (contador > (limite / 2)) {
+             status = status + " (metade superior)"
+             processado_com_sucesso = true
+         } else {
+             dummy: number = 0 
+         }
+      } else {
+         status = "Processado item ímpar"
+         if (contador == 5) {
+             status = "Erro"
+             processado_com_sucesso = false
+         }
+      }
+   }
+
+   final_msg: string = "Concluído. Status final: " + status + ". Sucesso: "
+
+   final_msg = "Concluído. Status final: " + status
+
+   return final_msg
+}

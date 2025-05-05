@@ -1,0 +1,7 @@
+func teste_tipos_mistos() -> bool {
+    a: number = 10
+    b: bool = true
+    c: string = "oi"
+
+    return a == c
+}

@@ -1,0 +1,9 @@
+func soma(a: number, b: number) -> number {
+    return a + b
+}
+
+func main() -> number {
+    x: number = 42
+    y: number = soma(x, 10)
+    return y
+}
