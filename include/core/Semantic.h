@@ -8,9 +8,22 @@
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
+#include <set>
 #include <stack>
 #include <string>
 #include <variant>
+#include <map>
+#include <utility>
+#include <iostream>
+#include <iomanip>
+
+struct FunctionSignature {
+    std::string name;
+    std::vector<TokenType> param_types;
+    TokenType return_type;
+    bool check_param_count = true;
+    int min_params = 0;
+};
 
 class SemanticAnalyzer {
 public:
@@ -39,31 +52,27 @@ public:
      */
     static Token create_type_token(TokenType type);
 
-    
+
                         /* Interface para o Runner  */
 
-    /**
-     * @brief Obtém acesso (somente leitura) à tabela de funções após a análise.
-     * O Runner pode usar isso para encontrar a definição de uma função durante a execução.
-     * @return Uma referência constante para o mapa de nomes de função para ponteiros FunctionStmt.
-     * @note Chame este método *após* chamar analyze() com sucesso e verificar se não há erros.
-     */
     const std::unordered_map<std::string, FunctionStmt*>& get_function_table() const;
+
+    const std::unordered_map<std::string, std::vector<Symbol>>& get_function_symbols() const;
+    
+    const std::vector<std::unordered_map<std::string, Symbol>>& get_symbol_scopes() const;
+
+    void imprimirVariaveisPorFuncao() const;
 
 
 private:
-    /* Tabela de símbolos: um vetor de mapas, representando os escopos aninhados. */
     std::vector<std::unordered_map<std::string, Symbol>> scopes;
-
-    /* Pilha de contexto: rastreia em qual statement (função, loop) estamos atualmente.
-     * return, break, continue. */
     std::stack<Stmt*> context_stack;
-
-    /* Tabela de funções: mapeia nomes de função para seus nós FunctionStmt na AST.
-     * Os ponteiros não possuem ownership (os nós pertencem à AST principal). */
     std::unordered_map<std::string, FunctionStmt*> function_table;
-
+    std::unordered_map<std::string, FunctionSignature> builtin_functions;
+    std::unordered_map<std::string, std::vector<Symbol>> function_symbols;
     std::vector<std::unique_ptr<Error>> errors;
+
+    void register_builtin_functions();
 
     void push_scope();
     void pop_scope();
@@ -74,6 +83,8 @@ private:
     bool is_numeric_type(const Token& type);
     bool is_boolean_type(const Token& type);
     bool is_valid_type(const Token& type_token);
+    bool is_array_type(const Token& type_token [[maybe_unused]]);
+    Token get_array_element_type(const Token& array_type_token [[maybe_unused]]);
 
     void register_function(const FunctionStmt& func);
 
@@ -91,6 +102,7 @@ private:
     void visit_seq(const SeqStmt& seq);
     void visit_par(const ParStmt& par);
     void visit_cchannel(const CChannelStmt& channel);
+    void visit_expression_statement(const ExpressionStmt& expr_stmt);
 
     Token visit(Expr* expr);
     Token visit_literal(const LiteralExpr& lit);
@@ -105,4 +117,6 @@ private:
     void report_error(const std::string& message, const Token& token);
     void report_error(const std::string& message, unsigned int column, unsigned int line);
     const Token& get_expr_token(const std::unique_ptr<Expr>& expr);
+
+    void add_symbol_to_current_function(const Symbol& symbol);
 };

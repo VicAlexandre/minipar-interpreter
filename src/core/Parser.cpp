@@ -46,7 +46,7 @@ void Parser::sync() {
     if (brace_level == 0) {
       if (at_statement_start &&
           (type == TokenType::FUNC || type == TokenType::IF || 
-           type == TokenType::FOR || type == TokenType::WHILE || 
+           type == TokenType::WHILE || type == TokenType::FOR || 
            type == TokenType::SEQ || type == TokenType::PAR || 
            type == TokenType::C_CHANNEL || type == TokenType::RETURN || 
            type == TokenType::BREAK || type == TokenType::CONTINUE || 
@@ -126,7 +126,10 @@ ParseResult Parser::parse() {
       sync();
       continue;
     }
-    statements.push_back(std::move(result.statement));
+
+    if (result.statement) {
+        statements.push_back(std::move(result.statement));
+    }
   }
   return {std::move(statements), std::move(syntax_errors)};
 }
@@ -157,7 +160,10 @@ StepResult Parser::parse_statement() {
     if (lookahead_is_declaration()) {
       return parse_declaration_stmt();
     }
-    return parse_assignment();
+    if (!is_at_end(current + 1) && tokens[current + 1].get_type() == TokenType::EQUAL_ASSIGN) {
+       return parse_assignment();
+    }
+    return parse_expression_statement();
   }
   if (match(TokenType::RETURN)) {
     return parse_return_stmt();
@@ -204,7 +210,7 @@ StepResult Parser::parse_function_stmt() {
     return STMT_PARSER_ERROR("Esperado '(' após nome da função");
   }
   consume();
-
+  
   std::vector<Token> param_names;
   std::vector<Token> param_types;
   if (!check(TokenType::RIGHT_PAREN)) {
@@ -258,14 +264,14 @@ StepResult Parser::parse_function_stmt() {
   BlockStmt body_block = body_result.statement->move_block_stmt();
 
   Params params{std::make_optional(std::move(param_names)), std::make_optional(std::move(param_types))};
-
+  
   return {std::make_unique<Stmt>(FunctionStmt{function_name, std::move(params), return_type, std::move(body_block)}), nullptr};
 }
 
 StepResult Parser::parse_if_stmt() {
   StepResult else_body_result{nullptr, nullptr};
   bool has_else_branch = false;
-
+  
   if (is_at_end() || peek() != TokenType::LEFT_PAREN) {
     return STMT_PARSER_ERROR("Esperado '(' após 'if'");
   }
@@ -357,109 +363,87 @@ StepResult Parser::parse_while_stmt() {
 }
 
 StepResult Parser::parse_for_stmt() {
-  // Guarda o token 'for' que foi consumido pelo match() que chamou esta função
   Token for_token = previous();
 
-  // Espera e consome '('
   if (!match(TokenType::LEFT_PAREN)) {
-      return STMT_PARSER_ERROR("Esperado '(' após 'for'");
+    return STMT_PARSER_ERROR("Esperado '(' após 'for'");
   }
-
-  // --- 1. Parse do Inicializador (Opcional: <assignment>) ---
+  
   std::unique_ptr<Stmt> initializer = nullptr;
-  // Verifica se o próximo token NÃO é o separador ';'. Se não for, espera uma atribuição.
   if (peek() != TokenType::SEMICOLON) {
-      // Verifica se realmente parece o início de uma atribuição (ID seguido de algo que não é ':')
       if (check(TokenType::IDENTIFIER) && !lookahead_is_declaration()) {
-          StepResult init_res = parse_assignment(); // Tenta analisar a atribuição
+          StepResult init_res = parse_assignment();
           if (init_res.syntax_error) {
-              return init_res; // Retorna erro se o parse da atribuição falhar
+            return init_res;
           }
-          // Verifica se parse_assignment realmente retornou um Stmt do tipo correto
           if (!init_res.statement || init_res.statement->get_type() != StmtType::ASSIGNMENT) {
-               return STMT_PARSER_ERROR("Erro interno: parse_assignment não retornou uma atribuição válida para o inicializador do 'for'");
+            return STMT_PARSER_ERROR("Erro interno: parse_assignment não retornou atribuição válida para inicializador do 'for'");
           }
           initializer = std::move(init_res.statement);
       } else {
-          // Se não for ';' E não for o início de uma atribuição válida, é um erro de sintaxe.
-          return STMT_PARSER_ERROR("Esperado ';' ou atribuição como inicializador do 'for'");
+        return STMT_PARSER_ERROR("Esperado ';' ou atribuição como inicializador do 'for'");
       }
   }
-  // Consome o primeiro ';' obrigatório (depois do inicializador ou se ele foi omitido)
   if (!match(TokenType::SEMICOLON)) {
-      return STMT_PARSER_ERROR("Esperado ';' após inicializador do 'for'");
+    return STMT_PARSER_ERROR("Esperado ';' após inicializador do 'for'");
   }
-
-  // --- 2. Parse da Condição (Opcional: <expression>) ---
-  ExprPtr condition = nullptr; // unique_ptr<Expr>
-  // Verifica se o próximo token NÃO é o separador ';'. Se não for, espera uma expressão.
+  
+  ExprPtr condition = nullptr;
   if (peek() != TokenType::SEMICOLON) {
-      ExprResult cond_res = parse_expression(); // Tenta analisar a expressão
+      ExprResult cond_res = parse_expression();
       if (cond_res.syntax_error) {
-          // Precisa retornar um StepResult, não ExprResult diretamente
-          return {nullptr, std::move(cond_res.syntax_error)};
+        return {nullptr, std::move(cond_res.syntax_error)};
       }
       condition = std::move(cond_res.expression);
   }
-  // Consome o segundo ';' obrigatório (depois da condição ou se ela foi omitida)
+
   if (!match(TokenType::SEMICOLON)) {
-      return STMT_PARSER_ERROR("Esperado ';' após condição do 'for'");
+    return STMT_PARSER_ERROR("Esperado ';' após condição do 'for'");
   }
 
-  // --- 3. Parse do Incremento (Opcional: <assignment>) ---
-  std::unique_ptr<Stmt> increment = nullptr; // unique_ptr<Stmt>
-  // Verifica se o próximo token NÃO é o ')' final. Se não for, espera uma atribuição.
+  std::unique_ptr<Stmt> increment = nullptr;
+
   if (peek() != TokenType::RIGHT_PAREN) {
-       // Verifica se realmente parece o início de uma atribuição
       if (check(TokenType::IDENTIFIER) && !lookahead_is_declaration()) {
-          StepResult incr_res = parse_assignment(); // Tenta analisar a atribuição
+          StepResult incr_res = parse_assignment(); 
           if (incr_res.syntax_error) {
-              return incr_res; // Retorna erro se o parse da atribuição falhar
+            return incr_res;
           }
-          // Verifica se parse_assignment retornou um Stmt do tipo correto
+
           if (!incr_res.statement || incr_res.statement->get_type() != StmtType::ASSIGNMENT) {
-              return STMT_PARSER_ERROR("Erro interno: parse_assignment não retornou uma atribuição válida para o incremento do 'for'");
+            return STMT_PARSER_ERROR("Erro interno: parse_assignment não retornou atribuição válida para incremento do 'for'");
           }
+
           increment = std::move(incr_res.statement);
       } else {
-           // Se não for ')' E não for o início de uma atribuição válida, é um erro.
-          return STMT_PARSER_ERROR("Esperado ')' ou atribuição como incremento do 'for'");
+        return STMT_PARSER_ERROR("Esperado ')' ou atribuição como incremento do 'for'");
       }
   }
-  // Consome o ')' obrigatório (depois do incremento ou se ele foi omitido)
+
   if (!match(TokenType::RIGHT_PAREN)) {
-      // Este erro é uma salvaguarda, a lógica anterior deveria garantir que ')' é o próximo token.
-      return STMT_PARSER_ERROR("Esperado ')' após cláusulas do 'for'");
+    return STMT_PARSER_ERROR("Esperado ')' após cláusulas do 'for'");
   }
 
-  // --- 4. Parse do Corpo (<block>) ---
-  // Verifica se o próximo token é '{' sem consumir
   if (!check(TokenType::LEFT_BRACE)) {
-     return STMT_PARSER_ERROR("Esperado '{' antes do corpo do 'for'");
+    return STMT_PARSER_ERROR("Esperado '{' antes do corpo do 'for'");
   }
-  // Consome o '{' antes de chamar parse_block, pois parse_block espera que ele já tenha sido consumido.
   consume();
 
-  // Chama parse_block para analisar o conteúdo entre {} e consumir o '}' final
   StepResult body_res = parse_block();
   if (body_res.syntax_error) {
-      return body_res; // Retorna erro se o parse do bloco falhar
+    return body_res;
   }
-  // Verifica se parse_block retornou um Stmt do tipo correto
+
   if (!body_res.statement || body_res.statement->get_type() != StmtType::BLOCK) {
-      return STMT_PARSER_ERROR("Erro interno: parse_block não retornou um bloco válido para o corpo do 'for'");
+    return STMT_PARSER_ERROR("Erro interno: parse_block não retornou bloco válido para corpo do 'for'");
   }
-  // Move o BlockStmt resultante para uma variável local
+
   BlockStmt body_block = body_res.statement->move_block_stmt();
 
-  // --- Cria o nó ForStmt ---
-  // Cria e retorna o Stmt contendo o ForStmt construído
-  return {std::make_unique<Stmt>(ForStmt{for_token, // Passa o token 'for' guardado
-                                         std::move(initializer),
-                                         std::move(condition),
-                                         std::move(increment),
-                                         std::move(body_block)}),
-          nullptr}; // Retorna nullptr para syntax_error indicando sucesso
+  return {std::make_unique<Stmt>(ForStmt{for_token, 
+          std::move(initializer), std::move(condition), 
+          std::move(increment), std::move(body_block)}), 
+          nullptr};
 }
 
 StepResult Parser::parse_seq_stmt() {
@@ -468,7 +452,7 @@ StepResult Parser::parse_seq_stmt() {
   }
   consume();
 
-  StepResult body_result = parse_block();
+  StepResult body_result = parse_block(); 
   if (body_result.syntax_error) {
     return body_result;
   }
@@ -495,6 +479,7 @@ StepResult Parser::parse_par_stmt() {
   if (!body_result.statement || body_result.statement->get_type() != StmtType::BLOCK) {
     return STMT_PARSER_ERROR("Erro interno: Corpo do 'par' inválido");
   }
+
   BlockStmt body_block = body_result.statement->move_block_stmt();
 
   return {std::make_unique<Stmt>(ParStmt{std::move(body_block)}), nullptr};
@@ -520,7 +505,7 @@ StepResult Parser::parse_c_channel_stmt() {
 }
 
 StepResult Parser::parse_declaration_stmt() {
-  Token identifier = consume();
+  Token identifier = consume(); 
 
   if (is_at_end() || peek() != TokenType::COLON) {
     return STMT_PARSER_ERROR("Erro interno: Esperado ':' após ID na declaração");
@@ -544,7 +529,7 @@ StepResult Parser::parse_declaration_stmt() {
   if (expr.syntax_error) {
     return {nullptr, std::move(expr.syntax_error)};
   }
-
+  
   return {std::make_unique<Stmt>(DeclarationStmt{identifier, type, std::move(expr.expression)}), nullptr};
 }
 
@@ -589,7 +574,6 @@ StepResult Parser::parse_continue_stmt() {
 ExprResult Parser::parse_expression() {
   return parse_disjunction();
 }
-
 ExprResult Parser::parse_disjunction() {
   ExprResult left = parse_conjunction();
   if (left.syntax_error) {
@@ -633,7 +617,7 @@ ExprResult Parser::parse_equality() {
     if (right.syntax_error) {
       return right;
     }
-    left.expression = std::make_unique<BinaryExpr>(std::move(left.expression), op, std::move(right.expression));
+      left.expression = std::make_unique<BinaryExpr>(std::move(left.expression), op, std::move(right.expression));
   }
   return left;
 }
@@ -737,7 +721,6 @@ ExprResult Parser::parse_local() {
     return EXPR_PARSER_ERROR("Esperado identificador no início de <local>");
   }
   ExprPtr expr = std::make_unique<VariableExpr>(previous());
-
   while (true) {
     if (match(TokenType::DOT)) {
       if (!match(TokenType::IDENTIFIER)) {
@@ -775,4 +758,12 @@ ExprResult Parser::parse_local() {
     }
   }
   return {std::move(expr), nullptr};
+}
+
+StepResult Parser::parse_expression_statement() {
+    ExprResult expr_res = parse_expression();
+    if (expr_res.syntax_error) {
+        return {nullptr, std::move(expr_res.syntax_error)};
+    }
+    return {std::make_unique<Stmt>(ExpressionStmt{std::move(expr_res.expression)}), nullptr};
 }
