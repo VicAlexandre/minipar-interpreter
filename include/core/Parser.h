@@ -32,6 +32,7 @@ public:
 private:
   std::vector<Token> tokens;
   unsigned int current;
+  std::vector<std::unique_ptr<Error>> syntax_errors;
 
   StepResult parse_statement();
 
@@ -58,6 +59,7 @@ private:
   StepResult parse_function_stmt();
   StepResult parse_if_stmt();
   StepResult parse_while_stmt();
+  StepResult parse_for_stmt();
   StepResult parse_seq_stmt();
   StepResult parse_par_stmt();
   StepResult parse_c_channel_stmt();
@@ -66,6 +68,8 @@ private:
   StepResult parse_return_stmt();
   StepResult parse_break_stmt();
   StepResult parse_continue_stmt();
+  StepResult parse_expression_statement();
+  StepResult parse_block();
 
   /* private expression parsing functions */
   ExprResult parse_expression();
@@ -78,6 +82,4 @@ private:
   ExprResult parse_unary();
   ExprResult parse_primary();
   ExprResult parse_local();
-
-  StepResult parse_block();
 };

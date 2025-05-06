@@ -6,7 +6,7 @@ func soma(a: number, b: number) -> number {
 }
 
 func main() -> number {
-    x: number = 42
+    x: number = 42 # teste
     y: number = soma(x, 10)
 
     z: number = print(y)

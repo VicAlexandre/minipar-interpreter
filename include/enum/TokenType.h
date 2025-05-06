@@ -19,6 +19,7 @@ enum class TokenType {
   SLASH,         /** / */
   PERCENT,       /** % */
   COLON,         /** : */
+  SEMICOLON,     /** ; */
 
   /* One or two character tokens */
   MINUS,         /** - */
@@ -45,6 +46,7 @@ enum class TokenType {
   IF,            /** if */
   ELSE,          /** else */
   WHILE,         /** while */
+  FOR,           /** for */
   RETURN,        /** return */
   BREAK,         /** break */
   CONTINUE,      /** continue */

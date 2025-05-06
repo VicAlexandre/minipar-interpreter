@@ -23,7 +23,7 @@ int Minipar::run_file(const std::string filename) {
   std::string line;
   std::string script;
   while (std::getline(script_file, line)) {
-    script += line;
+    script += line + "\n";
   }
 
   run(script);
@@ -60,6 +60,13 @@ int Minipar::run(const std::string script) {
 
   Executor executor;
   executor.execute(parse_res.statements, semantic.get_function_table());
+
+  semantic.imprimirVariaveisPorFuncao();
+   if (!has_error) {
+   } else {
+        std::cout << "Execução cancelada devido a erros." << std::endl;
+   }
+
 
   return 0;
 }

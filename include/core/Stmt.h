@@ -20,10 +20,12 @@ enum class StmtType {
     BLOCK,
     IF,
     WHILE,
+    FOR,
     FUNCTION,
     SEQ,
     PAR,
     CCHANNEL,
+    EXPRESSION,
 };
 
 /* declaration of Stmt and StmtPtr to avoid circular dependency */
@@ -70,6 +72,14 @@ struct WhileStmt {
     BlockStmt body;
 };
 
+struct ForStmt {
+    Token for_keyword;
+    std::unique_ptr<Stmt> initializer;
+    ExprPtr condition;
+    std::unique_ptr<Stmt> increment;
+    BlockStmt body;
+};
+
 struct FunctionStmt {
     Token name;
     Params params;
@@ -91,6 +101,10 @@ struct CChannelStmt {
     Token id_2;
 };
 
+struct ExpressionStmt {
+    ExprPtr expression;
+};
+
 class Stmt {
 public:
     template <typename T> Stmt(T stmt) : node(std::move(stmt)) {
@@ -110,6 +124,8 @@ public:
             type = StmtType::IF;
         } else if constexpr (std::is_same_v<T, WhileStmt>) {
             type = StmtType::WHILE;
+        } else if constexpr (std::is_same_v<T, ForStmt>) { 
+            type = StmtType::FOR; 
         } else if constexpr (std::is_same_v<T, FunctionStmt>) {
             type = StmtType::FUNCTION;
         } else if constexpr (std::is_same_v<T, SeqStmt>) {
@@ -118,6 +134,8 @@ public:
             type = StmtType::PAR;
         } else if constexpr (std::is_same_v<T, CChannelStmt>) {
             type = StmtType::CCHANNEL;
+        } else if constexpr (std::is_same_v<T, ExpressionStmt>) { 
+            type = StmtType::EXPRESSION; 
         }
     }
 
@@ -138,8 +156,12 @@ public:
                 return arg.condition->get_token();
             } else if constexpr (std::is_same_v<T, WhileStmt>) {
                 return arg.condition->get_token();
+            } else if constexpr (std::is_same_v<T, ForStmt>) { 
+                return arg.for_keyword;
             } else if constexpr (std::is_same_v<T, CChannelStmt>) {
                 return arg.identifier;
+            } else if constexpr (std::is_same_v<T, ExpressionStmt>) { 
+                if (arg.expression) return arg.expression->get_token(); 
             }
             // Default case for statements without obvious token
             static Token dummy{TokenType::TYPE_NONE, "", 0, 0};
@@ -156,10 +178,12 @@ public:
     BlockStmt& get_block_stmt() { return std::get<BlockStmt>(node); }
     IfStmt& get_if_stmt() { return std::get<IfStmt>(node); }
     WhileStmt& get_while_stmt() { return std::get<WhileStmt>(node); }
+    ForStmt& get_for_stmt() { return std::get<ForStmt>(node); }
     FunctionStmt& get_function_stmt() { return std::get<FunctionStmt>(node); }
     SeqStmt& get_seq_stmt() { return std::get<SeqStmt>(node); }
     ParStmt& get_par_stmt() { return std::get<ParStmt>(node); }
     CChannelStmt& get_c_channel_stmt() { return std::get<CChannelStmt>(node); }
+    ExpressionStmt& get_expression_stmt() { return std::get<ExpressionStmt>(node); }
 
     // Move versions of getters
     DeclarationStmt move_decl_stmt() { return std::move(std::get<DeclarationStmt>(node)); }
@@ -170,16 +194,18 @@ public:
     BlockStmt move_block_stmt() { return std::move(std::get<BlockStmt>(node)); }
     IfStmt move_if_stmt() { return std::move(std::get<IfStmt>(node)); }
     WhileStmt move_while_stmt() { return std::move(std::get<WhileStmt>(node)); }
+    ForStmt move_for_stmt() { return std::move(std::get<ForStmt>(node)); }
     FunctionStmt move_function_stmt() { return std::move(std::get<FunctionStmt>(node)); }
     SeqStmt move_seq_stmt() { return std::move(std::get<SeqStmt>(node)); }
     ParStmt move_par_stmt() { return std::move(std::get<ParStmt>(node)); }
     CChannelStmt move_c_channel_stmt() { return std::move(std::get<CChannelStmt>(node)); }
+    ExpressionStmt move_expression_stmt() { return std::move(std::get<ExpressionStmt>(node)); }
 
 private:
     using Variant =
         std::variant<DeclarationStmt, AssignmentStmt, ReturnStmt, BreakStmt,
-                    ContinueStmt, BlockStmt, IfStmt, CChannelStmt, WhileStmt,
-                    FunctionStmt, SeqStmt, ParStmt>;
+                     ContinueStmt, BlockStmt, IfStmt, CChannelStmt, WhileStmt,
+                     ForStmt, FunctionStmt, SeqStmt, ParStmt, ExpressionStmt>;
 
     StmtType type;
     Variant node;
