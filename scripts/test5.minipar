@@ -1,3 +1,7 @@
+func print(a : string) -> number {
+    return 0
+}
+
 func saudacao(nome: string, formal: bool) -> string {
   msg: string = ""
   if (formal) {
@@ -16,3 +20,6 @@ func principal() -> string {
   mensagem = saudacao("Carlos", true)
   return mensagem
 }
+
+x: string = principal()
+y: number = print(x)

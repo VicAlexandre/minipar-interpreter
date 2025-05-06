@@ -8,7 +8,7 @@
 /**
  * @brief All possible literal types for a Minipar token.
  */
-using ValueType = std::variant<double, std::string, bool>;
+using ValueType = std::variant<int, double, std::string, bool>;
 
 /**
  * @brief Represents a single unit of a Minipar program
@@ -35,6 +35,7 @@ public:
 
     // Getters
     const ValueType& get_literal() const { return literal; }
+    int get_number() const { return std::get<int>(literal); }
     double get_double() const { return std::get<double>(literal); }
     std::string get_string() const { return std::get<std::string>(literal); }
     bool get_bool() const { return std::get<bool>(literal); }

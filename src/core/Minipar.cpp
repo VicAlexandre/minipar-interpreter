@@ -3,6 +3,7 @@
 #include "../include/core/Scanner.h"
 #include "../include/core/Token.h"
 #include "../include/core/Semantic.h"
+#include "../include/core/Executor.h"
 
 #include <filesystem>
 #include <fstream>
@@ -55,7 +56,10 @@ int Minipar::run(const std::string script) {
           std::cerr << error->get_message() << std::endl;
       }
       return EXIT_FAILURE;
-  }  
+  } 
+
+  Executor executor;
+  executor.execute(parse_res.statements, semantic.get_function_table());
 
   return 0;
 }

@@ -1,4 +1,10 @@
+
+func print(a : number) -> number {
+    return 0
+}
+
 func fibonacci(n: number) -> number {
+  
   if (n <= 0) {
     return 0
   } else {
@@ -13,6 +19,14 @@ func fibonacci(n: number) -> number {
 }
 
 func teste_fibonacci() -> number {
-  resultado: number = fibonacci(10)
+  resultado: number = fibonacci(20)
   return resultado
 }
+
+func main() -> number {
+    x: number = teste_fibonacci()
+    z: number = print(x)
+    return z
+}
+
+x: number = main()

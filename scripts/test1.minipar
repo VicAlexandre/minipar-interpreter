@@ -1,9 +1,16 @@
+func print(a : number) -> number {
+    return 0
+}
 func soma(a: number, b: number) -> number {
-    return a + b
+    return a | b
 }
 
 func main() -> number {
     x: number = 42
     y: number = soma(x, 10)
+
+    z: number = print(y)
     return y
 }
+
+x: number = main()

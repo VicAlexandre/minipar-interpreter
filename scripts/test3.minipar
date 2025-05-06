@@ -1,3 +1,10 @@
+func print(a : number) -> number {
+    return 0
+}
+
+x: bool = verificar(20)
+y: number = print(x)
+
 func verificar(idade: number) -> bool {
   maior_de_idade: bool = false
   limite: number = 18
