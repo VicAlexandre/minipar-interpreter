@@ -50,7 +50,6 @@ int Minipar::run(const std::string script) {
 
   SemanticAnalyzer semantic;
   auto semanticErrors = semantic.analyze(parse_res.statements);
-  
   if (!semanticErrors.empty()) {
       for (const auto& error : semanticErrors) {
           std::cerr << error->get_message() << std::endl;
@@ -61,11 +60,42 @@ int Minipar::run(const std::string script) {
   Executor executor;
   executor.execute(parse_res.statements, semantic.get_function_table());
 
-  semantic.imprimirVariaveisPorFuncao();
-   if (!has_error) {
-   } else {
-        std::cout << "Execução cancelada devido a erros." << std::endl;
-   }
+  // semantic.imprimirVariaveisPorFuncao();
+  //Mostra globais
+  //const auto& scopes_from_semantic = semantic.get_symbol_scopes();
+  //if (!scopes_from_semantic.empty()) {
+  //    for (const auto& [var_name, symbol_info] : scopes_from_semantic[0]) {
+  //        std::cout << "  -> Global: " << symbol_info.name.get_lexeme()
+  //                  << " : " << symbol_info.type.get_lexeme() << std::endl;
+  //    }
+  //}
+  //Mostra os funções
+  //const auto& func_symbols_map = semantic.get_function_symbols();
+  //if (!func_symbols_map.empty()) {
+  //    for (const auto& [func_name, symbols_vector] : func_symbols_map) {
+  //        if (!symbols_vector.empty()) {
+  //            for (const auto& symbol_info : symbols_vector) {
+  //                std::cout << "  -> Funções: " << symbol_info.name.get_lexeme() 
+  //                          << " : " << symbol_info.type.get_lexeme()         
+  //                          << " (Linha: " << symbol_info.name.get_line() << ")" << std::endl;
+  //          }
+  //        }
+  //    }
+  //}
+  //Outros simbolos locais descartados
+  //const auto& all_symbols = semantic.get_all_declared_symbols();
+  //if (!all_symbols.empty()) {
+  //    for (const auto& pair : all_symbols) {
+  //        int depth = pair.first;
+  //        const auto& symbol_info = pair.second;
+  //        std::cout << std::string(depth * 2, ' ')
+  //                  << "- " << symbol_info.name.get_lexeme()
+  //                  << " : " << symbol_info.type.get_lexeme()
+  //                  << " (Linha: " << symbol_info.name.get_line()
+  //                  << ", Profundidade: " << depth << ")"
+  //                  << std::endl;
+  //    }
+  //}
 
 
   return 0;

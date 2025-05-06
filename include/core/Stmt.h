@@ -52,9 +52,13 @@ struct ReturnStmt {
     std::unique_ptr<Expr> value;
 };
 
-struct BreakStmt {};
+struct BreakStmt {
+    Token keyword;
+};
 
-struct ContinueStmt {};
+struct ContinueStmt {
+    Token keyword;
+};
 
 struct BlockStmt {
     std::vector<StmtPtr> statements;
@@ -144,12 +148,17 @@ public:
     const Token& get_token() const {
         return std::visit([](auto&& arg) -> const Token& {
             using T = std::decay_t<decltype(arg)>;
+            static Token dummy{TokenType::TYPE_NONE, "", 0, 0};
             if constexpr (std::is_same_v<T, DeclarationStmt>) {
                 return arg.identifier;
             } else if constexpr (std::is_same_v<T, AssignmentStmt>) {
                 return arg.identifier;
             } else if constexpr (std::is_same_v<T, ReturnStmt>) {
-                return arg.value->get_token();
+                if (arg.value) {
+                    return arg.value->get_token();
+                } else {
+                    return dummy;
+                }
             } else if constexpr (std::is_same_v<T, FunctionStmt>) {
                 return arg.name;
             } else if constexpr (std::is_same_v<T, IfStmt>) {
@@ -163,8 +172,6 @@ public:
             } else if constexpr (std::is_same_v<T, ExpressionStmt>) { 
                 if (arg.expression) return arg.expression->get_token(); 
             }
-            // Default case for statements without obvious token
-            static Token dummy{TokenType::TYPE_NONE, "", 0, 0};
             return dummy;
         }, node);
     }

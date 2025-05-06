@@ -1,0 +1,40 @@
+func fatorial(x: number, y: number) -> void
+{
+  func fat(n: number) -> number{
+    prod: number = 1
+    i: number = 2
+    while(i <= n){
+      prod = prod * i
+      i = i + 1
+    }
+    return prod
+  }
+
+  i: number = x
+  while(i <= y)
+  {
+    print("Fatorial de:", i, "=", fat(i))
+    i = i + 1
+    sleep(0.5)
+  }
+}
+
+func fibonacci(n: number) -> void{
+  a: number = 0
+  b: number = 1
+  count: number = 0
+
+  while (count < n)
+  {
+    print("Fib:", a)
+    aux: number = a + b
+    a = b
+    b = aux
+    count = count + 1
+    sleep(0.5)
+  }
+}
+
+
+fatorial(2, 5)
+fibonacci(10)

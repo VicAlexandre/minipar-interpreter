@@ -1,0 +1,14 @@
+func fatorial(n: number) -> number
+{
+  if (n == 0 || n == 1)
+  {
+    return 1
+  }
+  else {
+  return n * fatorial(n - 1)
+  }
+}
+
+print("CALCULA O FATORIAL RECURSIVO")
+valor: number = 10
+print("Fatorial: ", fatorial(valor))

@@ -61,10 +61,13 @@ public:
     
     const std::vector<std::unordered_map<std::string, Symbol>>& get_symbol_scopes() const;
 
+    const std::vector<std::pair<int, Symbol>>& get_all_declared_symbols() const;
+
     void imprimirVariaveisPorFuncao() const;
 
 
 private:
+    int loop_level = 0;
     std::vector<std::unordered_map<std::string, Symbol>> scopes;
     std::stack<Stmt*> context_stack;
     std::unordered_map<std::string, FunctionStmt*> function_table;
@@ -73,6 +76,8 @@ private:
     std::vector<std::unique_ptr<Error>> errors;
 
     void register_builtin_functions();
+
+    std::vector<std::pair<int, Symbol>> all_declared_symbols;
 
     void push_scope();
     void pop_scope();

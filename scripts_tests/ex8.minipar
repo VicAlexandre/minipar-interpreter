@@ -1,0 +1,13 @@
+
+
+id: number = 1
+
+while(id < 20)
+{
+  if(id % 2 == 0){
+    id = id + 1
+    continue
+  }
+  print(id)
+  id = id + 1
+}

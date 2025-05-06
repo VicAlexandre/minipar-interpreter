@@ -49,7 +49,7 @@ SemanticAnalyzer::SemanticAnalyzer() {
 
 void SemanticAnalyzer::register_builtin_functions() {
   builtin_functions["print"] = {"print", {}, TokenType::TYPE_NONE, false, 1};
-  builtin_functions["input"] = {"input", {}, TokenType::TYPE_STRING};
+  builtin_functions["input"] = {"input", {TokenType::TYPE_STRING}, TokenType::TYPE_STRING, false, 0};
   builtin_functions["to_number"] = {
       "to_number", {TokenType::TYPE_NONE}, TokenType::TYPE_NUMBER};
   builtin_functions["to_string"] = {
@@ -76,6 +76,7 @@ SemanticAnalyzer::analyze(std::vector<std::unique_ptr<Stmt>> &statements) {
   errors.clear();
   function_table.clear();
   function_symbols.clear();
+  all_declared_symbols.clear();
 
   for (size_t i = 0; i < statements.size(); ++i) {
     if (statements[i] && statements[i]->get_type() == StmtType::FUNCTION) {
@@ -137,6 +138,7 @@ bool SemanticAnalyzer::declare_symbol(const Symbol &symbol) {
     return false;
   }
   current_scope.emplace(name, symbol);
+  all_declared_symbols.emplace_back(scopes.size() - 1, symbol);
   return true;
 }
 
@@ -152,14 +154,15 @@ SemanticAnalyzer::find_symbol(const std::string &name) {
   return nullptr;
 }
 
-bool SemanticAnalyzer::check_types(const Token &expected, const Token &actual) {
-  if (expected.get_type() == TokenType::TYPE_NONE) {
-    return actual.get_type() != TokenType::TYPE_NONE;
+bool SemanticAnalyzer::check_types(const Token &expected_token, const Token &actual_token) {
+  TokenType expected = expected_token.get_type();
+  TokenType actual = actual_token.get_type();
+
+  if (expected == TokenType::TYPE_NONE) { 
+      return actual == TokenType::TYPE_NONE;
+  } else {
+      return (actual != TokenType::TYPE_NONE) && (expected == actual);
   }
-  if (actual.get_type() == TokenType::TYPE_NONE) {
-    return false;
-  }
-  return expected.get_type() == actual.get_type();
 }
 
 bool SemanticAnalyzer::is_numeric_type(const Token &type) {
@@ -454,46 +457,20 @@ void SemanticAnalyzer::visit_return(const ReturnStmt &ret) {
 }
 
 void SemanticAnalyzer::visit_break(const BreakStmt &brk) {
-  bool in_loop = false;
-  std::stack<Stmt *> temp_context = context_stack;
-  while (temp_context.size() > 1) {
-    Stmt *enclosing_stmt = temp_context.top();
-    temp_context.pop();
-    if (enclosing_stmt && (enclosing_stmt->get_type() == StmtType::WHILE ||
-                            enclosing_stmt->get_type() == StmtType::FOR)) {
-      in_loop = true;
-      break;
-    }
-    if (enclosing_stmt && enclosing_stmt->get_type() == StmtType::FUNCTION) {
-      break;
-    }
-  }
-  if (!in_loop) {
+  if (loop_level == 0) {
     report_error(
-        "Statement 'break' encontrado fora de um loop ('while' ou 'for').", 0,
-        0);
+        "Statement 'break' encontrado fora de um loop ('while' ou 'for').",
+        brk.keyword
+    );
   }
 }
 
 void SemanticAnalyzer::visit_continue(const ContinueStmt &cont) {
-  bool in_loop = false;
-  std::stack<Stmt *> temp_context = context_stack;
-  while (temp_context.size() > 1) {
-    Stmt *enclosing_stmt = temp_context.top();
-    temp_context.pop();
-    if (enclosing_stmt && (enclosing_stmt->get_type() == StmtType::WHILE ||
-                            enclosing_stmt->get_type() == StmtType::FOR)) {
-      in_loop = true;
-      break;
-    }
-    if (enclosing_stmt && enclosing_stmt->get_type() == StmtType::FUNCTION) {
-      break;
-    }
-  }
-  if (!in_loop) {
+  if (loop_level == 0) {
     report_error(
         "Statement 'continue' encontrado fora de um loop ('while' ou 'for').",
-        0, 0);
+        cont.keyword);
+  }
 }
 
 void SemanticAnalyzer::visit_function(const FunctionStmt &func) {
@@ -564,7 +541,14 @@ void SemanticAnalyzer::visit_while(const WhileStmt &while_stmt) {
                 0);
     return;
   }
-  visit_block(while_stmt.body);
+  loop_level++;
+  try {
+    visit_block(while_stmt.body);
+  } catch (...) {
+    loop_level--;
+    throw; 
+  }
+  loop_level--;
 }
 
 void SemanticAnalyzer::visit_for(const ForStmt &for_stmt) {
@@ -582,7 +566,14 @@ void SemanticAnalyzer::visit_for(const ForStmt &for_stmt) {
   if (for_stmt.increment) {
     visit(for_stmt.increment.get());
   }
-  visit_block(for_stmt.body);
+  loop_level++;
+  try {
+    visit_block(for_stmt.body);
+  } catch (...) {
+    loop_level--;
+    throw;
+  }
+  loop_level--;
 }
 
 void SemanticAnalyzer::visit_seq(const SeqStmt &seq) { visit_block(seq.body); }
@@ -912,8 +903,7 @@ Token SemanticAnalyzer::visit_index(const IndexExpr &index) {
   return get_array_element_type(object_type);
 }
 
-void SemanticAnalyzer::report_error(const std::string &message,
-                                     const Token &token) {
+void SemanticAnalyzer::report_error(const std::string &message, const Token &token) {
   std::string full_message = "[Linha " + std::to_string(token.get_line()) +
                               "] Erro: " + message + " na posição " +
                               std::to_string(token.get_column());
@@ -925,13 +915,12 @@ void SemanticAnalyzer::report_error(const std::string &message,
     }
   }
   if (!found) {
-    std::cerr << "[SEMANTIC ERROR] " << full_message << std::endl;
     errors.push_back(
         std::make_unique<Error>(message, token.get_column(), token.get_line()));
   }
 }
-void SemanticAnalyzer::report_error(const std::string &message,
-                                     unsigned int column, unsigned int line) {
+
+void SemanticAnalyzer::report_error(const std::string &message, unsigned int column, unsigned int line) {
   std::string full_message = "[Linha " + std::to_string(line) +
                               "] Erro: " + message + " na posição " +
                               std::to_string(column);
@@ -943,10 +932,10 @@ void SemanticAnalyzer::report_error(const std::string &message,
     }
   }
   if (!found) {
-    std::cerr << "[SEMANTIC ERROR] " << full_message << std::endl;
     errors.push_back(std::make_unique<Error>(message, column, line));
   }
 }
+
 const Token &
 SemanticAnalyzer::get_expr_token(const std::unique_ptr<Expr> &expr) {
   static Token dummy_token{TokenType::TYPE_NONE, "[expr]", 0, 0};
@@ -967,38 +956,54 @@ SemanticAnalyzer::get_function_symbols() const {
 }
 
 void SemanticAnalyzer::imprimirVariaveisPorFuncao() const {
-  std::cout << "\n--- Variáveis por Função (da Análise Semântica) ---"
-            << std::endl;
-
-  const auto &func_symbols_map = function_symbols;
-
-  if (func_symbols_map.empty()) {
-    std::cout << "(Nenhuma função com símbolos locais encontrada)" << std::endl;
-  } else {
-    for (const auto &pair : func_symbols_map) {
-      const std::string &func_name = pair.first;
-      const auto &symbols = pair.second;
-
-      std::cout << "Função: " << func_name
-                << std::endl;
-
-      if (symbols.empty()) {
-        std::cout << "  (Nenhum parâmetro ou variável local declarada)"
-                  << std::endl;
+  std::cout << "\n--- Símbolos por Escopo (da Análise Semântica) ---" << std::endl;
+  if (!scopes.empty()) {
+      const auto& global_scope = scopes[0];
+      std::cout << "Escopo: Global" << std::endl;
+      if (global_scope.empty()) {
+          std::cout << "  (Nenhuma variável global declarada)" << std::endl;
       } else {
-        for (const auto &symbol : symbols) {
-          std::cout << "  - " << std::left << std::setw(15)
-                    << symbol.name.get_lexeme()
-                    << " : " << std::setw(10)
-                    << symbol.type.get_lexeme()
-                    << " (Linha: " << symbol.name.get_line()
-                    << ")"
-                    << std::endl;
-        }
+          for (const auto& pair : global_scope) {
+              const auto& symbol = pair.second;
+              std::cout << "  - " << std::left << std::setw(15)
+                        << symbol.name.get_lexeme()
+                        << " : " << std::setw(10)
+                        << symbol.type.get_lexeme()
+                        << " (Linha: " << symbol.name.get_line() << ")"
+                        << std::endl;
+          }
       }
-      std::cout << std::endl;
-    }
+       std::cout << "-------------------------------------------------------" << std::endl;
+  } else {
+       std::cout << "(Escopo global não encontrado/vazio)" << std::endl;
+       std::cout << "-------------------------------------------------------" << std::endl;
   }
-  std::cout << "-------------------------------------------------------\n"
-            << std::endl;
+  const auto& func_symbols_map = function_symbols;
+  if (func_symbols_map.empty()) {
+      std::cout << "(Nenhuma função com símbolos locais encontrada para listar separadamente)" << std::endl;
+  } else {
+      for (const auto& pair : func_symbols_map) {
+          const std::string& func_name = pair.first;
+          const auto& symbols = pair.second;
+          std::cout << "Escopo: Função '" << func_name << "'" << std::endl;
+          if (symbols.empty()) {
+              std::cout << "  (Nenhum parâmetro ou variável local declarada nesta função)" << std::endl;
+          } else {
+              for (const auto& symbol : symbols) {
+                  std::cout << "  - " << std::left << std::setw(15)
+                            << symbol.name.get_lexeme()
+                            << " : " << std::setw(10)
+                            << symbol.type.get_lexeme()
+                            << " (Linha: " << symbol.name.get_line() << ")"
+                            << std::endl;
+              }
+          }
+           std::cout << "-------------------------------------------------------" << std::endl;
+      }
+  }
+}
+
+const std::vector<std::pair<int, SemanticAnalyzer::Symbol>>&
+SemanticAnalyzer::get_all_declared_symbols() const {
+    return all_declared_symbols;
 }
