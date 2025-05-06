@@ -494,6 +494,7 @@ void SemanticAnalyzer::visit_continue(const ContinueStmt &cont) {
     report_error(
         "Statement 'continue' encontrado fora de um loop ('while' ou 'for').",
         0, 0);
+  }
 }
 
 void SemanticAnalyzer::visit_function(const FunctionStmt &func) {
