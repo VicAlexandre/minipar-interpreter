@@ -225,7 +225,9 @@ StepResult Parser::parse_function_stmt() {
       }
       consume();
 
-      if (is_at_end() || (!check(TokenType::TYPE_NUMBER) && !check(TokenType::TYPE_BOOL) && !check(TokenType::TYPE_STRING))) {
+      if (is_at_end() || !(check(TokenType::TYPE_NUMBER) ||
+                           check(TokenType::TYPE_BOOL) ||
+                           check(TokenType::TYPE_STRING))) {
         return STMT_PARSER_ERROR("Esperado tipo ('number', 'bool', 'string') para o parâmetro '" + param_names.back().get_lexeme() + "'");
       }
       param_types.push_back(consume());
@@ -243,8 +245,11 @@ StepResult Parser::parse_function_stmt() {
   }
   consume();
 
-  if (is_at_end() || (!check(TokenType::TYPE_NUMBER) && !check(TokenType::TYPE_BOOL) && !check(TokenType::TYPE_STRING))) {
-    return STMT_PARSER_ERROR("Esperado tipo de retorno ('number', 'bool', 'string') após '->'");
+  if (is_at_end() || !(check(TokenType::TYPE_NUMBER) ||
+                       check(TokenType::TYPE_BOOL) ||
+                       check(TokenType::TYPE_STRING) ||
+                       check(TokenType::TYPE_NONE))) {
+    return STMT_PARSER_ERROR("Esperado tipo de retorno ('number', 'bool', 'string' ou 'void') após '->'");
   }
   Token return_type = consume();
 
@@ -564,11 +569,15 @@ StepResult Parser::parse_return_stmt() {
 }
 
 StepResult Parser::parse_break_stmt() {
-  return {std::make_unique<Stmt>(BreakStmt{}), nullptr};
+  Token keyword = previous();
+  auto stmt = std::make_unique<Stmt>(BreakStmt{keyword});
+  return {std::move(stmt), nullptr};
 }
 
 StepResult Parser::parse_continue_stmt() {
-  return {std::make_unique<Stmt>(ContinueStmt{}), nullptr};
+  Token keyword = previous();
+  auto stmt = std::make_unique<Stmt>(ContinueStmt{keyword});
+  return {std::move(stmt), nullptr};
 }
 
 ExprResult Parser::parse_expression() {

@@ -1,0 +1,19 @@
+a: number = 10
+b: bool = true
+
+# comentário simples
+
+func soma(num1: number, num2: number) -> number
+{
+    s: number = num1 + num2
+    while(a < 20){
+      a = a + 1
+      print(a)
+      if(a == 15){break}
+    }
+
+    return s + 10
+}
+
+
+print(soma(2, 3))

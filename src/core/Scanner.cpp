@@ -24,6 +24,7 @@ std::unordered_map<std::string, TokenType> keywords = {
     {"string", TokenType::TYPE_STRING},
     {"true", TokenType::TRUE_LITERAL},
     {"false", TokenType::FALSE_LITERAL},
+    {"void", TokenType::TYPE_NONE}
 };
 
 static inline bool is_digit(char c) { return c >= '0' && c <= '9'; }
