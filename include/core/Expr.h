@@ -5,14 +5,15 @@
 #include <vector>
 
 enum class ExprType {
-    LITERAL,
-    VARIABLE,
-    BINARY,
-    UNARY,
-    GROUPING,
-    CALL,
-    GET,
-    INDEX
+  LITERAL,
+  VARIABLE,
+  BINARY,
+  UNARY,
+  GROUPING,
+  CALL,
+  GET,
+  INDEX,
+  ARRAY_LITERAL
 };
 
 /**
@@ -20,14 +21,11 @@ enum class ExprType {
  */
 class Expr {
 public:
-    virtual ~Expr() = default;
-    virtual ExprType get_type() const = 0;
-    virtual const Token& get_token() const = 0;
+  virtual ~Expr() = default;
+  virtual ExprType get_type() const = 0;
+  virtual const Token &get_token() const = 0;
 };
 
-/**
- * A unique pointer to an expression.
- */
 using ExprPtr = std::unique_ptr<Expr>;
 
 /**
@@ -35,15 +33,15 @@ using ExprPtr = std::unique_ptr<Expr>;
  */
 class BinaryExpr : public Expr {
 public:
-    ExprPtr left;
-    Token op;
-    ExprPtr right;
+  ExprPtr left;
+  Token op;
+  ExprPtr right;
 
-    BinaryExpr(ExprPtr left, Token op, ExprPtr right)
-        : left(std::move(left)), op(op), right(std::move(right)) {}
-    
-    ExprType get_type() const override { return ExprType::BINARY; }
-    const Token& get_token() const override { return op; }
+  BinaryExpr(ExprPtr left, Token op, ExprPtr right)
+      : left(std::move(left)), op(op), right(std::move(right)) {}
+
+  ExprType get_type() const override { return ExprType::BINARY; }
+  const Token &get_token() const override { return op; }
 };
 
 /**
@@ -51,13 +49,13 @@ public:
  */
 class UnaryExpr : public Expr {
 public:
-    Token op;
-    ExprPtr right;
+  Token op;
+  ExprPtr right;
 
-    UnaryExpr(Token op, ExprPtr right) : op(op), right(std::move(right)) {}
-    
-    ExprType get_type() const override { return ExprType::UNARY; }
-    const Token& get_token() const override { return op; }
+  UnaryExpr(Token op, ExprPtr right) : op(op), right(std::move(right)) {}
+
+  ExprType get_type() const override { return ExprType::UNARY; }
+  const Token &get_token() const override { return op; }
 };
 
 /**
@@ -65,12 +63,13 @@ public:
  */
 class GroupingExpr : public Expr {
 public:
-    ExprPtr expression;
+  ExprPtr expression;
 
-    GroupingExpr(ExprPtr expression) : expression(std::move(expression)) {}
-    
-    ExprType get_type() const override { return ExprType::GROUPING; }
-    const Token& get_token() const override { return expression->get_token(); }
+  GroupingExpr(ExprPtr expression) : expression(std::move(expression)) {}
+
+  ExprType get_type() const override { return ExprType::GROUPING; }
+
+  const Token &get_token() const override { return expression->get_token(); }
 };
 
 /**
@@ -79,12 +78,12 @@ public:
  */
 class LiteralExpr : public Expr {
 public:
-    Token value;
+  Token value;
 
-    LiteralExpr(Token value) : value(value) {}
-    
-    ExprType get_type() const override { return ExprType::LITERAL; }
-    const Token& get_token() const override { return value; }
+  LiteralExpr(Token value) : value(value) {}
+
+  ExprType get_type() const override { return ExprType::LITERAL; }
+  const Token &get_token() const override { return value; }
 };
 
 /**
@@ -92,12 +91,12 @@ public:
  */
 class VariableExpr : public Expr {
 public:
-    Token name;
+  Token name;
 
-    VariableExpr(Token name) : name(name) {}
-    
-    ExprType get_type() const override { return ExprType::VARIABLE; }
-    const Token& get_token() const override { return name; }
+  VariableExpr(Token name) : name(name) {}
+
+  ExprType get_type() const override { return ExprType::VARIABLE; }
+  const Token &get_token() const override { return name; }
 };
 
 /**
@@ -106,15 +105,16 @@ public:
  */
 class CallExpr : public Expr {
 public:
-    ExprPtr callee;
-    Token paren;
-    std::vector<ExprPtr> arguments;
+  ExprPtr callee;
+  Token paren;
+  std::vector<ExprPtr> arguments;
 
-    CallExpr(ExprPtr callee, Token paren, std::vector<ExprPtr> arguments)
-        : callee(std::move(callee)), paren(paren), arguments(std::move(arguments)) {}
-    
-    ExprType get_type() const override { return ExprType::CALL; }
-    const Token& get_token() const override { return paren; }
+  CallExpr(ExprPtr callee, Token paren, std::vector<ExprPtr> arguments)
+      : callee(std::move(callee)), paren(paren),
+        arguments(std::move(arguments)) {}
+
+  ExprType get_type() const override { return ExprType::CALL; }
+  const Token &get_token() const override { return paren; }
 };
 
 /**
@@ -122,13 +122,13 @@ public:
  */
 class GetExpr : public Expr {
 public:
-    ExprPtr object;
-    Token name;
+  ExprPtr object;
+  Token name;
 
-    GetExpr(ExprPtr object, Token name) : object(std::move(object)), name(name) {}
-    
-    ExprType get_type() const override { return ExprType::GET; }
-    const Token& get_token() const override { return name; }
+  GetExpr(ExprPtr object, Token name) : object(std::move(object)), name(name) {}
+
+  ExprType get_type() const override { return ExprType::GET; }
+  const Token &get_token() const override { return name; }
 };
 
 /**
@@ -136,13 +136,29 @@ public:
  */
 class IndexExpr : public Expr {
 public:
-    ExprPtr object;
-    Token bracket;
-    Token index;
+  ExprPtr object;
+  Token bracket;
+  ExprPtr index_expr;
 
-    IndexExpr(ExprPtr object, Token bracket, Token index)
-        : object(std::move(object)), bracket(bracket), index(index) {}
-    
-    ExprType get_type() const override { return ExprType::INDEX; }
-    const Token& get_token() const override { return bracket; }
+  IndexExpr(ExprPtr object, Token bracket, ExprPtr index_expr)
+      : object(std::move(object)), bracket(bracket),
+        index_expr(std::move(index_expr)) {}
+
+  ExprType get_type() const override { return ExprType::INDEX; }
+  const Token &get_token() const override { return bracket; }
+};
+
+/**
+ * @brief Representa um literal de array (ex: [1, 2, 3]).
+ */
+class ArrayLiteralExpr : public Expr {
+public:
+  Token left_bracket;
+  std::vector<ExprPtr> elements;
+
+  ArrayLiteralExpr(Token left_bracket, std::vector<ExprPtr> elements)
+      : left_bracket(left_bracket), elements(std::move(elements)) {}
+
+  ExprType get_type() const override { return ExprType::ARRAY_LITERAL; }
+  const Token &get_token() const override { return left_bracket; }
 };

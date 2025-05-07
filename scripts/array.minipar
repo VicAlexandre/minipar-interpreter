@@ -1,0 +1,22 @@
+print("Teste de array_number - Acesso Total")
+
+idades: array = [22, 35, 19, 42, 28]
+
+print(idades[0])
+print(idades[1]) 
+print(idades[2]) 
+print(idades[3]) 
+print(idades[4]) 
+
+val_a: number = 10
+val_b: number = 5
+val_c: number = 3
+
+outro_array: array = [val_a + val_b, val_b * val_c, idades[0] - val_b, 100]
+
+print(outro_array[0])
+print(outro_array[1])
+print(outro_array[2])
+print(outro_array[3])
+
+print("Teste concluido.")

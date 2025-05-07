@@ -15,7 +15,6 @@ func activation(sum: number) -> number
 
 print("Entrada: ", input_val, " Desejado: ", output_desire)
 
-# Inicializa Erro
 error: number = 1000.0
 iteration: number = 0
 bias: number = 1
