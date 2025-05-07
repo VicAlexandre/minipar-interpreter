@@ -1,3 +1,4 @@
+
 func processa_dados(limite: number) -> string {
    contador: number = 0
    status: string = "Iniciando"
@@ -30,3 +31,7 @@ func processa_dados(limite: number) -> string {
 
    return final_msg
 }
+
+x: string = processa_dados(12)
+
+y: number = print(x)

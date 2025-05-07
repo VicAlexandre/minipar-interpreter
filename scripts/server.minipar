@@ -34,4 +34,4 @@ func calc(message: string) -> string{
 
 
 description: string = "CALCULADORA SIMPLES"
-s_channel server {calc, description, "localhost", 8585}
+c_channel server {calc, "localhost", 8585}

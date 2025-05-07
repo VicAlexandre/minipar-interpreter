@@ -14,3 +14,7 @@ func main() -> number {
    resultado: number = teste_for_simples()
    return resultado
 }
+
+x: number = main()
+
+print(x)

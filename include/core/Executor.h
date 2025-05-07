@@ -59,8 +59,11 @@ private:
     Value visit_unary(const UnaryExpr& expr);
     Value visit_grouping(const GroupingExpr& expr);
     Value visit_call(CallExpr& expr);
+    Value visit_index(const IndexExpr& expr);
     
     void visit_break(const BreakStmt& brk);
+    void visit_for(const ForStmt& stmt);
+    void visit_expression(const ExpressionStmt& stmt);
     void visit_continue(const ContinueStmt& cont);
     void visit(Stmt* stmt);
     void visit_block(const BlockStmt& stmt);

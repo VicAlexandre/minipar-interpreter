@@ -33,7 +33,7 @@ while(error != 0)
   output: number = activation(sum)
   print("Saída: ", output)
 
-  error: number = output_desire - output
+  error = output_desire - output
   print("Erro: ", error)
 
   if (error != 0)

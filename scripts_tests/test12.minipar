@@ -46,4 +46,4 @@ func main() -> number {
   return 0 # Retorno padrão para main
 }
 
-# Chamada (implícita) da função main pelo runner
+x:
