@@ -331,7 +331,6 @@ Executor::Value Executor::visit_call(CallExpr& expr) {
             }
             throw std::runtime_error("len só suporta strings");
         }
-        if ()
 
         auto it = table_function.find(func_name); 
         if (it == table_function.end()) { 
