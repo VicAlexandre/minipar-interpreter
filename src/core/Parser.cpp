@@ -1,29 +1,33 @@
 #include "../include/core/Parser.h"
-#include "../include/core/Stmt.h"
-#include "../include/core/Expr.h"
 #include "../include/core/Error.h"
+#include "../include/core/Expr.h"
+#include "../include/core/Stmt.h"
 #include "../include/enum/TokenType.h"
 
 #include <cassert>
 #include <memory>
-#include <vector>
 #include <optional>
 #include <string>
+#include <vector>
 
 /**
  * @brief If a parse error occurs, this macro will create a new StepResult
  * with a nullptr statement and an Error object with the error message.
  */
 #define STMT_PARSER_ERROR(_msg)                                                \
-  StepResult{nullptr, std::make_unique<Error>(_msg, tokens[current].get_column(), \
-                                    tokens[current].get_line())}
+  StepResult {                                                                 \
+    nullptr, std::make_unique<Error>(_msg, tokens[current].get_column(),       \
+                                     tokens[current].get_line())               \
+  }
 
 /**
  * @brief Similar, but to expr.
  */
 #define EXPR_PARSER_ERROR(_msg)                                                \
-  ExprResult{nullptr, std::make_unique<Error>(_msg, tokens[current].get_column(), \
-                                   tokens[current].get_line())}
+  ExprResult {                                                                 \
+    nullptr, std::make_unique<Error>(_msg, tokens[current].get_column(),       \
+                                     tokens[current].get_line())               \
+  }
 
 void Parser::sync() {
   int brace_level = 0;
@@ -45,11 +49,11 @@ void Parser::sync() {
 
     if (brace_level == 0) {
       if (at_statement_start &&
-          (type == TokenType::FUNC || type == TokenType::IF || 
-           type == TokenType::WHILE || type == TokenType::FOR || 
-           type == TokenType::SEQ || type == TokenType::PAR || 
-           type == TokenType::C_CHANNEL || type == TokenType::RETURN || 
-           type == TokenType::BREAK || type == TokenType::CONTINUE || 
+          (type == TokenType::FUNC || type == TokenType::IF ||
+           type == TokenType::WHILE || type == TokenType::FOR ||
+           type == TokenType::SEQ || type == TokenType::PAR ||
+           type == TokenType::C_CHANNEL || type == TokenType::RETURN ||
+           type == TokenType::BREAK || type == TokenType::CONTINUE ||
            type == TokenType::IDENTIFIER)) {
         return;
       }
@@ -68,7 +72,8 @@ void Parser::sync() {
 
 void Parser::rewind(int steps) {
   assert(steps > 0 && "Tentativa de retroceder 0 ou menos passos");
-  assert(current >= static_cast<unsigned int>(steps) && "Tentativa de retroceder além do início");
+  assert(current >= static_cast<unsigned int>(steps) &&
+         "Tentativa de retroceder além do início");
   current -= steps;
 }
 
@@ -77,7 +82,9 @@ Token Parser::consume() {
     Token token = tokens[current++];
     return token;
   }
-  return Token(TokenType::END_OF_FILE, "", tokens.empty() ? 0 : tokens.back().get_line(), tokens.empty() ? 0 : tokens.back().get_column() + 1);
+  return Token(TokenType::END_OF_FILE, "",
+               tokens.empty() ? 0 : tokens.back().get_line(),
+               tokens.empty() ? 0 : tokens.back().get_column() + 1);
 }
 
 Token Parser::previous() {
@@ -128,7 +135,7 @@ ParseResult Parser::parse() {
     }
 
     if (result.statement) {
-        statements.push_back(std::move(result.statement));
+      statements.push_back(std::move(result.statement));
     }
   }
   return {std::move(statements), std::move(syntax_errors)};
@@ -144,9 +151,9 @@ StepResult Parser::parse_statement() {
   if (match(TokenType::WHILE)) {
     return parse_while_stmt();
   }
-  if (match(TokenType::FOR)) { 
-    return parse_for_stmt(); 
-  } 
+  if (match(TokenType::FOR)) {
+    return parse_for_stmt();
+  }
   if (match(TokenType::SEQ)) {
     return parse_seq_stmt();
   }
@@ -160,8 +167,9 @@ StepResult Parser::parse_statement() {
     if (lookahead_is_declaration()) {
       return parse_declaration_stmt();
     }
-    if (!is_at_end(current + 1) && tokens[current + 1].get_type() == TokenType::EQUAL_ASSIGN) {
-       return parse_assignment();
+    if (!is_at_end(current + 1) &&
+        tokens[current + 1].get_type() == TokenType::EQUAL_ASSIGN) {
+      return parse_assignment();
     }
     return parse_expression_statement();
   }
@@ -196,9 +204,7 @@ bool Parser::lookahead_is_declaration() {
   return tokens[current + 1].get_type() == TokenType::COLON;
 }
 
-bool Parser::check(TokenType type) {
-  return !is_at_end() && peek() == type;
-}
+bool Parser::check(TokenType type) { return !is_at_end() && peek() == type; }
 
 StepResult Parser::parse_function_stmt() {
   if (is_at_end() || peek() != TokenType::IDENTIFIER) {
@@ -210,7 +216,7 @@ StepResult Parser::parse_function_stmt() {
     return STMT_PARSER_ERROR("Esperado '(' após nome da função");
   }
   consume();
-  
+
   std::vector<Token> param_names;
   std::vector<Token> param_types;
   if (!check(TokenType::RIGHT_PAREN)) {
@@ -221,14 +227,18 @@ StepResult Parser::parse_function_stmt() {
       param_names.push_back(consume());
 
       if (is_at_end() || peek() != TokenType::COLON) {
-        return STMT_PARSER_ERROR("Esperado ':' após nome do parâmetro '" + param_names.back().get_lexeme() + "'");
+        return STMT_PARSER_ERROR("Esperado ':' após nome do parâmetro '" +
+                                 param_names.back().get_lexeme() + "'");
       }
       consume();
 
-      if (is_at_end() || !(check(TokenType::TYPE_NUMBER) ||
-                           check(TokenType::TYPE_BOOL) ||
-                           check(TokenType::TYPE_STRING))) {
-        return STMT_PARSER_ERROR("Esperado tipo ('number', 'bool', 'string') para o parâmetro '" + param_names.back().get_lexeme() + "'");
+      if (is_at_end() ||
+          !(check(TokenType::TYPE_NUMBER) || check(TokenType::TYPE_BOOL) ||
+            check(TokenType::TYPE_STRING) ||
+            check(TokenType::TYPE_ARRAY_NUMBER))) {
+        return STMT_PARSER_ERROR("Esperado tipo ('number', 'bool', 'string', "
+                                 "ou 'array_number') para o parâmetro '" +
+                                 param_names.back().get_lexeme() + "'");
       }
       param_types.push_back(consume());
 
@@ -241,20 +251,23 @@ StepResult Parser::parse_function_stmt() {
   consume();
 
   if (is_at_end() || peek() != TokenType::ARROW) {
-    return STMT_PARSER_ERROR("Esperado '->' após ')' para indicar tipo de retorno");
+    return STMT_PARSER_ERROR(
+        "Esperado '->' após ')' para indicar tipo de retorno");
   }
   consume();
 
-  if (is_at_end() || !(check(TokenType::TYPE_NUMBER) ||
-                       check(TokenType::TYPE_BOOL) ||
-                       check(TokenType::TYPE_STRING) ||
-                       check(TokenType::TYPE_NONE))) {
-    return STMT_PARSER_ERROR("Esperado tipo de retorno ('number', 'bool', 'string' ou 'void') após '->'");
+  if (is_at_end() ||
+      !(check(TokenType::TYPE_NUMBER) || check(TokenType::TYPE_BOOL) ||
+        check(TokenType::TYPE_STRING) || check(TokenType::TYPE_NONE) ||
+        check(TokenType::TYPE_ARRAY_NUMBER))) {
+    return STMT_PARSER_ERROR("Esperado tipo de retorno ('number', 'bool', "
+                             "'string', 'void' ou 'array_number') após '->'");
   }
   Token return_type = consume();
 
   if (is_at_end() || peek() != TokenType::LEFT_BRACE) {
-    return STMT_PARSER_ERROR("Esperado '{' antes do corpo da função '" + function_name.get_lexeme() + "'");
+    return STMT_PARSER_ERROR("Esperado '{' antes do corpo da função '" +
+                             function_name.get_lexeme() + "'");
   }
   consume();
 
@@ -263,20 +276,26 @@ StepResult Parser::parse_function_stmt() {
     return body_result;
   }
 
-  if (!body_result.statement || body_result.statement->get_type() != StmtType::BLOCK) {
-    return STMT_PARSER_ERROR("Erro interno: parse_block não retornou um bloco válido");
+  if (!body_result.statement ||
+      body_result.statement->get_type() != StmtType::BLOCK) {
+    return STMT_PARSER_ERROR(
+        "Erro interno: parse_block não retornou um bloco válido");
   }
   BlockStmt body_block = body_result.statement->move_block_stmt();
 
-  Params params{std::make_optional(std::move(param_names)), std::make_optional(std::move(param_types))};
-  
-  return {std::make_unique<Stmt>(FunctionStmt{function_name, std::move(params), return_type, std::move(body_block)}), nullptr};
+  Params params{std::make_optional(std::move(param_names)),
+                std::make_optional(std::move(param_types))};
+
+  return {
+      std::make_unique<Stmt>(FunctionStmt{function_name, std::move(params),
+                                          return_type, std::move(body_block)}),
+      nullptr};
 }
 
 StepResult Parser::parse_if_stmt() {
   StepResult else_body_result{nullptr, nullptr};
   bool has_else_branch = false;
-  
+
   if (is_at_end() || peek() != TokenType::LEFT_PAREN) {
     return STMT_PARSER_ERROR("Esperado '(' após 'if'");
   }
@@ -317,20 +336,25 @@ StepResult Parser::parse_if_stmt() {
     }
   }
 
-  if (!body_result.statement || body_result.statement->get_type() != StmtType::BLOCK) {
+  if (!body_result.statement ||
+      body_result.statement->get_type() != StmtType::BLOCK) {
     return STMT_PARSER_ERROR("Erro interno: Bloco 'then' inválido");
   }
   BlockStmt then_block = body_result.statement->move_block_stmt();
 
   std::optional<BlockStmt> else_block_opt = std::nullopt;
   if (has_else_branch) {
-    if (!else_body_result.statement || else_body_result.statement->get_type() != StmtType::BLOCK) {
+    if (!else_body_result.statement ||
+        else_body_result.statement->get_type() != StmtType::BLOCK) {
       return STMT_PARSER_ERROR("Erro interno: Bloco 'else' inválido");
     }
     else_block_opt = else_body_result.statement->move_block_stmt();
   }
 
-  return {std::make_unique<Stmt>(IfStmt{std::move(condition.expression), std::move(then_block), std::move(else_block_opt), has_else_branch}), nullptr};
+  return {std::make_unique<Stmt>(
+              IfStmt{std::move(condition.expression), std::move(then_block),
+                     std::move(else_block_opt), has_else_branch}),
+          nullptr};
 }
 
 StepResult Parser::parse_while_stmt() {
@@ -359,12 +383,15 @@ StepResult Parser::parse_while_stmt() {
     return body_result;
   }
 
-  if (!body_result.statement || body_result.statement->get_type() != StmtType::BLOCK) {
+  if (!body_result.statement ||
+      body_result.statement->get_type() != StmtType::BLOCK) {
     return STMT_PARSER_ERROR("Erro interno: Corpo do 'while' inválido");
   }
   BlockStmt body_block = body_result.statement->move_block_stmt();
 
-  return {std::make_unique<Stmt>(WhileStmt{std::move(condition.expression), std::move(body_block)}), nullptr};
+  return {std::make_unique<Stmt>(WhileStmt{std::move(condition.expression),
+                                           std::move(body_block)}),
+          nullptr};
 }
 
 StepResult Parser::parse_for_stmt() {
@@ -373,33 +400,37 @@ StepResult Parser::parse_for_stmt() {
   if (!match(TokenType::LEFT_PAREN)) {
     return STMT_PARSER_ERROR("Esperado '(' após 'for'");
   }
-  
+
   std::unique_ptr<Stmt> initializer = nullptr;
   if (peek() != TokenType::SEMICOLON) {
-      if (check(TokenType::IDENTIFIER) && !lookahead_is_declaration()) {
-          StepResult init_res = parse_assignment();
-          if (init_res.syntax_error) {
-            return init_res;
-          }
-          if (!init_res.statement || init_res.statement->get_type() != StmtType::ASSIGNMENT) {
-            return STMT_PARSER_ERROR("Erro interno: parse_assignment não retornou atribuição válida para inicializador do 'for'");
-          }
-          initializer = std::move(init_res.statement);
-      } else {
-        return STMT_PARSER_ERROR("Esperado ';' ou atribuição como inicializador do 'for'");
+    if (check(TokenType::IDENTIFIER) && !lookahead_is_declaration()) {
+      StepResult init_res = parse_assignment();
+      if (init_res.syntax_error) {
+        return init_res;
       }
+      if (!init_res.statement ||
+          init_res.statement->get_type() != StmtType::ASSIGNMENT) {
+        return STMT_PARSER_ERROR(
+            "Erro interno: parse_assignment não retornou atribuição válida "
+            "para inicializador do 'for'");
+      }
+      initializer = std::move(init_res.statement);
+    } else {
+      return STMT_PARSER_ERROR(
+          "Esperado ';' ou atribuição como inicializador do 'for'");
+    }
   }
   if (!match(TokenType::SEMICOLON)) {
     return STMT_PARSER_ERROR("Esperado ';' após inicializador do 'for'");
   }
-  
+
   ExprPtr condition = nullptr;
   if (peek() != TokenType::SEMICOLON) {
-      ExprResult cond_res = parse_expression();
-      if (cond_res.syntax_error) {
-        return {nullptr, std::move(cond_res.syntax_error)};
-      }
-      condition = std::move(cond_res.expression);
+    ExprResult cond_res = parse_expression();
+    if (cond_res.syntax_error) {
+      return {nullptr, std::move(cond_res.syntax_error)};
+    }
+    condition = std::move(cond_res.expression);
   }
 
   if (!match(TokenType::SEMICOLON)) {
@@ -409,20 +440,23 @@ StepResult Parser::parse_for_stmt() {
   std::unique_ptr<Stmt> increment = nullptr;
 
   if (peek() != TokenType::RIGHT_PAREN) {
-      if (check(TokenType::IDENTIFIER) && !lookahead_is_declaration()) {
-          StepResult incr_res = parse_assignment(); 
-          if (incr_res.syntax_error) {
-            return incr_res;
-          }
-
-          if (!incr_res.statement || incr_res.statement->get_type() != StmtType::ASSIGNMENT) {
-            return STMT_PARSER_ERROR("Erro interno: parse_assignment não retornou atribuição válida para incremento do 'for'");
-          }
-
-          increment = std::move(incr_res.statement);
-      } else {
-        return STMT_PARSER_ERROR("Esperado ')' ou atribuição como incremento do 'for'");
+    if (check(TokenType::IDENTIFIER) && !lookahead_is_declaration()) {
+      StepResult incr_res = parse_assignment();
+      if (incr_res.syntax_error) {
+        return incr_res;
       }
+
+      if (!incr_res.statement ||
+          incr_res.statement->get_type() != StmtType::ASSIGNMENT) {
+        return STMT_PARSER_ERROR("Erro interno: parse_assignment não retornou "
+                                 "atribuição válida para incremento do 'for'");
+      }
+
+      increment = std::move(incr_res.statement);
+    } else {
+      return STMT_PARSER_ERROR(
+          "Esperado ')' ou atribuição como incremento do 'for'");
+    }
   }
 
   if (!match(TokenType::RIGHT_PAREN)) {
@@ -439,15 +473,17 @@ StepResult Parser::parse_for_stmt() {
     return body_res;
   }
 
-  if (!body_res.statement || body_res.statement->get_type() != StmtType::BLOCK) {
-    return STMT_PARSER_ERROR("Erro interno: parse_block não retornou bloco válido para corpo do 'for'");
+  if (!body_res.statement ||
+      body_res.statement->get_type() != StmtType::BLOCK) {
+    return STMT_PARSER_ERROR("Erro interno: parse_block não retornou bloco "
+                             "válido para corpo do 'for'");
   }
 
   BlockStmt body_block = body_res.statement->move_block_stmt();
 
-  return {std::make_unique<Stmt>(ForStmt{for_token, 
-          std::move(initializer), std::move(condition), 
-          std::move(increment), std::move(body_block)}), 
+  return {std::make_unique<Stmt>(
+              ForStmt{for_token, std::move(initializer), std::move(condition),
+                      std::move(increment), std::move(body_block)}),
           nullptr};
 }
 
@@ -457,12 +493,13 @@ StepResult Parser::parse_seq_stmt() {
   }
   consume();
 
-  StepResult body_result = parse_block(); 
+  StepResult body_result = parse_block();
   if (body_result.syntax_error) {
     return body_result;
   }
 
-  if (!body_result.statement || body_result.statement->get_type() != StmtType::BLOCK) {
+  if (!body_result.statement ||
+      body_result.statement->get_type() != StmtType::BLOCK) {
     return STMT_PARSER_ERROR("Erro interno: Corpo do 'seq' inválido");
   }
   BlockStmt body_block = body_result.statement->move_block_stmt();
@@ -481,7 +518,8 @@ StepResult Parser::parse_par_stmt() {
     return body_result;
   }
 
-  if (!body_result.statement || body_result.statement->get_type() != StmtType::BLOCK) {
+  if (!body_result.statement ||
+      body_result.statement->get_type() != StmtType::BLOCK) {
     return STMT_PARSER_ERROR("Erro interno: Corpo do 'par' inválido");
   }
 
@@ -492,33 +530,43 @@ StepResult Parser::parse_par_stmt() {
 
 StepResult Parser::parse_c_channel_stmt() {
   if (is_at_end() || peek() != TokenType::IDENTIFIER) {
-    return STMT_PARSER_ERROR("Esperado identificador (nome do canal) após 'c_channel'");
+    return STMT_PARSER_ERROR(
+        "Esperado identificador (nome do canal) após 'c_channel'");
   }
   Token channel_name = consume();
 
   if (is_at_end() || peek() != TokenType::IDENTIFIER) {
-    return STMT_PARSER_ERROR("Esperado primeiro identificador associado após nome do canal '" + channel_name.get_lexeme() + "'");
+    return STMT_PARSER_ERROR(
+        "Esperado primeiro identificador associado após nome do canal '" +
+        channel_name.get_lexeme() + "'");
   }
   Token id_1 = consume();
 
   if (is_at_end() || peek() != TokenType::IDENTIFIER) {
-    return STMT_PARSER_ERROR("Esperado segundo identificador associado após '" + id_1.get_lexeme() + "'");
+    return STMT_PARSER_ERROR("Esperado segundo identificador associado após '" +
+                             id_1.get_lexeme() + "'");
   }
   Token id_2 = consume();
 
-  return {std::make_unique<Stmt>(CChannelStmt{channel_name, id_1, id_2}), nullptr};
+  return {std::make_unique<Stmt>(CChannelStmt{channel_name, id_1, id_2}),
+          nullptr};
 }
 
 StepResult Parser::parse_declaration_stmt() {
-  Token identifier = consume(); 
+  Token identifier = consume();
 
   if (is_at_end() || peek() != TokenType::COLON) {
-    return STMT_PARSER_ERROR("Erro interno: Esperado ':' após ID na declaração");
+    return STMT_PARSER_ERROR(
+        "Erro interno: Esperado ':' após ID na declaração");
   }
   consume();
 
-  if (is_at_end() || (!check(TokenType::TYPE_NUMBER) && !check(TokenType::TYPE_BOOL) && !check(TokenType::TYPE_STRING))) {
-    return STMT_PARSER_ERROR("Esperado tipo ('number', 'bool', 'string') após ':'");
+  if (is_at_end() ||
+      (!check(TokenType::TYPE_NUMBER) && !check(TokenType::TYPE_BOOL) &&
+       !check(TokenType::TYPE_STRING) &&
+       !check(TokenType::TYPE_ARRAY_NUMBER))) {
+    return STMT_PARSER_ERROR("Esperado tipo ('number', 'bool', 'string', ou "
+                             "'array_number') após ':'");
   }
   Token type = consume();
 
@@ -534,18 +582,22 @@ StepResult Parser::parse_declaration_stmt() {
   if (expr.syntax_error) {
     return {nullptr, std::move(expr.syntax_error)};
   }
-  
-  return {std::make_unique<Stmt>(DeclarationStmt{identifier, type, std::move(expr.expression)}), nullptr};
+
+  return {std::make_unique<Stmt>(
+              DeclarationStmt{identifier, type, std::move(expr.expression)}),
+          nullptr};
 }
 
 StepResult Parser::parse_assignment() {
   if (is_at_end() || peek() != TokenType::IDENTIFIER) {
-    return STMT_PARSER_ERROR("Erro interno: Esperado identificador no início da atribuição");
+    return STMT_PARSER_ERROR(
+        "Erro interno: Esperado identificador no início da atribuição");
   }
   Token identifier = consume();
 
   if (is_at_end() || peek() != TokenType::EQUAL_ASSIGN) {
-    return STMT_PARSER_ERROR("Esperado '=' após identificador '" + identifier.get_lexeme() + "'");
+    return STMT_PARSER_ERROR("Esperado '=' após identificador '" +
+                             identifier.get_lexeme() + "'");
   }
   consume();
 
@@ -557,7 +609,9 @@ StepResult Parser::parse_assignment() {
     return {nullptr, std::move(expr.syntax_error)};
   }
 
-  return {std::make_unique<Stmt>(AssignmentStmt{identifier, std::move(expr.expression)}), nullptr};
+  return {std::make_unique<Stmt>(
+              AssignmentStmt{identifier, std::move(expr.expression)}),
+          nullptr};
 }
 
 StepResult Parser::parse_return_stmt() {
@@ -565,7 +619,8 @@ StepResult Parser::parse_return_stmt() {
   if (expr.syntax_error) {
     return {nullptr, std::move(expr.syntax_error)};
   }
-  return {std::make_unique<Stmt>(ReturnStmt{std::move(expr.expression)}), nullptr};
+  return {std::make_unique<Stmt>(ReturnStmt{std::move(expr.expression)}),
+          nullptr};
 }
 
 StepResult Parser::parse_break_stmt() {
@@ -580,9 +635,7 @@ StepResult Parser::parse_continue_stmt() {
   return {std::move(stmt), nullptr};
 }
 
-ExprResult Parser::parse_expression() {
-  return parse_disjunction();
-}
+ExprResult Parser::parse_expression() { return parse_disjunction(); }
 ExprResult Parser::parse_disjunction() {
   ExprResult left = parse_conjunction();
   if (left.syntax_error) {
@@ -594,7 +647,8 @@ ExprResult Parser::parse_disjunction() {
     if (right.syntax_error) {
       return right;
     }
-    left.expression = std::make_unique<BinaryExpr>(std::move(left.expression), op, std::move(right.expression));
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
   }
   return left;
 }
@@ -610,7 +664,8 @@ ExprResult Parser::parse_conjunction() {
     if (right.syntax_error) {
       return right;
     }
-    left.expression = std::make_unique<BinaryExpr>(std::move(left.expression), op, std::move(right.expression));
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
   }
   return left;
 }
@@ -626,7 +681,8 @@ ExprResult Parser::parse_equality() {
     if (right.syntax_error) {
       return right;
     }
-      left.expression = std::make_unique<BinaryExpr>(std::move(left.expression), op, std::move(right.expression));
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
   }
   return left;
 }
@@ -636,13 +692,15 @@ ExprResult Parser::parse_comparison() {
   if (left.syntax_error) {
     return left;
   }
-  while (match(TokenType::GREATER) || match(TokenType::GREATER_EQUAL) || match(TokenType::LESS) || match(TokenType::LESS_EQUAL)) {
+  while (match(TokenType::GREATER) || match(TokenType::GREATER_EQUAL) ||
+         match(TokenType::LESS) || match(TokenType::LESS_EQUAL)) {
     Token op = previous();
     ExprResult right = parse_sum();
     if (right.syntax_error) {
       return right;
     }
-    left.expression = std::make_unique<BinaryExpr>(std::move(left.expression), op, std::move(right.expression));
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
   }
   return left;
 }
@@ -658,7 +716,8 @@ ExprResult Parser::parse_sum() {
     if (right.syntax_error) {
       return right;
     }
-    left.expression = std::make_unique<BinaryExpr>(std::move(left.expression), op, std::move(right.expression));
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
   }
   return left;
 }
@@ -668,13 +727,15 @@ ExprResult Parser::parse_term() {
   if (left.syntax_error) {
     return left;
   }
-  while (match(TokenType::STAR) || match(TokenType::SLASH) || match(TokenType::PERCENT)) {
+  while (match(TokenType::STAR) || match(TokenType::SLASH) ||
+         match(TokenType::PERCENT)) {
     Token op = previous();
     ExprResult right = parse_unary();
     if (right.syntax_error) {
       return right;
     }
-    left.expression = std::make_unique<BinaryExpr>(std::move(left.expression), op, std::move(right.expression));
+    left.expression = std::make_unique<BinaryExpr>(
+        std::move(left.expression), op, std::move(right.expression));
   }
   return left;
 }
@@ -686,7 +747,8 @@ ExprResult Parser::parse_unary() {
     if (right.syntax_error) {
       return right;
     }
-    return {std::make_unique<UnaryExpr>(op, std::move(right.expression)), nullptr};
+    return {std::make_unique<UnaryExpr>(op, std::move(right.expression)),
+            nullptr};
   }
   return parse_primary();
 }
@@ -716,13 +778,36 @@ ExprResult Parser::parse_primary() {
     if (!match(TokenType::RIGHT_PAREN)) {
       return EXPR_PARSER_ERROR("Esperado ')' após expressão em parênteses");
     }
-    return {std::make_unique<GroupingExpr>(std::move(inner.expression)), nullptr};
+    return {std::make_unique<GroupingExpr>(std::move(inner.expression)),
+            nullptr};
+  }
+
+  if (match(TokenType::LEFT_BRACKET)) {
+    Token bracket_token = previous();
+    std::vector<ExprPtr> elements;
+
+    if (!check(TokenType::RIGHT_BRACKET)) {
+      do {
+        ExprResult element_expr = parse_expression();
+        if (element_expr.syntax_error) {
+          return element_expr;
+        }
+        elements.push_back(std::move(element_expr.expression));
+      } while (match(TokenType::COMMA));
+    }
+    if (!match(TokenType::RIGHT_BRACKET)) {
+      return EXPR_PARSER_ERROR("Esperado ']' para fechar o literal do array");
+    }
+    return {
+        std::make_unique<ArrayLiteralExpr>(bracket_token, std::move(elements)),
+        nullptr};
   }
 
   if (is_at_end()) {
     return EXPR_PARSER_ERROR("Expressão incompleta no final do arquivo");
   }
-  return EXPR_PARSER_ERROR("Token inesperado '" + tokens[current].get_lexeme() + "' ao iniciar expressão primária");
+  return EXPR_PARSER_ERROR("Token inesperado '" + tokens[current].get_lexeme() +
+                           "' ao iniciar expressão primária");
 }
 
 ExprResult Parser::parse_local() {
@@ -737,15 +822,21 @@ ExprResult Parser::parse_local() {
       }
       expr = std::make_unique<GetExpr>(std::move(expr), previous());
     } else if (match(TokenType::LEFT_BRACKET)) {
-      if (!match(TokenType::NUMBER)) {
-        return EXPR_PARSER_ERROR("Esperado número como índice dentro de '[]'");
+      Token bracket_token = previous();
+
+      ExprResult index_res = parse_expression();
+      if (index_res.syntax_error) {
+        return index_res;
       }
-      Token index = previous();
-      Token bracket = tokens[current - 2];
+      if (!index_res.expression) {
+        return EXPR_PARSER_ERROR("Erro interno: expressão de índice inválida.");
+      }
+
       if (!match(TokenType::RIGHT_BRACKET)) {
-        return EXPR_PARSER_ERROR("Esperado ']' após índice");
+        return EXPR_PARSER_ERROR("Esperado ']' após expressão de índice");
       }
-      expr = std::make_unique<IndexExpr>(std::move(expr), bracket, index);
+      expr = std::make_unique<IndexExpr>(std::move(expr), bracket_token,
+                                         std::move(index_res.expression));
     } else if (match(TokenType::LEFT_PAREN)) {
       Token paren = previous();
       std::vector<ExprPtr> args;
@@ -761,7 +852,8 @@ ExprResult Parser::parse_local() {
       if (!match(TokenType::RIGHT_PAREN)) {
         return EXPR_PARSER_ERROR("Esperado ')' após argumentos da chamada");
       }
-      expr = std::make_unique<CallExpr>(std::move(expr), paren, std::move(args));
+      expr =
+          std::make_unique<CallExpr>(std::move(expr), paren, std::move(args));
     } else {
       break;
     }
@@ -770,9 +862,11 @@ ExprResult Parser::parse_local() {
 }
 
 StepResult Parser::parse_expression_statement() {
-    ExprResult expr_res = parse_expression();
-    if (expr_res.syntax_error) {
-        return {nullptr, std::move(expr_res.syntax_error)};
-    }
-    return {std::make_unique<Stmt>(ExpressionStmt{std::move(expr_res.expression)}), nullptr};
+  ExprResult expr_res = parse_expression();
+  if (expr_res.syntax_error) {
+    return {nullptr, std::move(expr_res.syntax_error)};
+  }
+  return {
+      std::make_unique<Stmt>(ExpressionStmt{std::move(expr_res.expression)}),
+      nullptr};
 }

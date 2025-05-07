@@ -41,28 +41,29 @@ enum class TokenType {
   STRING_LITERAL, /** STRING */
 
   /* Keywords */
-  SEQ,           /** seq */
-  PAR,           /** par */
-  IF,            /** if */
-  ELSE,          /** else */
-  WHILE,         /** while */
-  FOR,           /** for */
-  RETURN,        /** return */
-  BREAK,         /** break */
-  CONTINUE,      /** continue */
-  FUNC,          /** func */
-  C_CHANNEL,     /** c_channel */
-  TYPE_NUMBER,   /** number */
-  TYPE_BOOL,     /** bool */
-  TYPE_STRING,   /** string */
-  TRUE_LITERAL,  /** true */
-  FALSE_LITERAL, /** false */
+  SEQ,               /** seq */
+  PAR,               /** par */
+  IF,                /** if */
+  ELSE,              /** else */
+  WHILE,             /** while */
+  FOR,               /** for */
+  RETURN,            /** return */
+  BREAK,             /** break */
+  CONTINUE,          /** continue */
+  FUNC,              /** func */
+  C_CHANNEL,         /** c_channel */
+  TYPE_NUMBER,       /** number */
+  TYPE_BOOL,         /** bool */
+  TYPE_STRING,       /** string */
+  TYPE_ARRAY_NUMBER, /** array_number */
+  TRUE_LITERAL,      /** true */
+  FALSE_LITERAL,     /** false */
 
   /* Special */
   END_OF_FILE, /** End of file */
 
   /* None */
-  TYPE_NONE,  /** Type none */
+  TYPE_NONE, /** Type none */
 };
 
 /**

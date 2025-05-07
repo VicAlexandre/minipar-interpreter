@@ -100,7 +100,7 @@ struct ParStmt {
 };
 
 struct CChannelStmt {
-    Token identifier;
+    Token channel_name;
     Token id_1;
     Token id_2;
 };
@@ -168,7 +168,7 @@ public:
             } else if constexpr (std::is_same_v<T, ForStmt>) { 
                 return arg.for_keyword;
             } else if constexpr (std::is_same_v<T, CChannelStmt>) {
-                return arg.identifier;
+                return arg.channel_name;
             } else if constexpr (std::is_same_v<T, ExpressionStmt>) { 
                 if (arg.expression) return arg.expression->get_token(); 
             }

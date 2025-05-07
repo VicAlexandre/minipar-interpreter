@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <string.h>
 
 Executor::Executor(){
     push_scope();
@@ -106,6 +107,8 @@ Executor::Value Executor::visit(Expr* expr) {
         case ExprType::UNARY: return visit_unary(*static_cast<UnaryExpr*>(expr));
         case ExprType::GROUPING: return visit_grouping(*static_cast<GroupingExpr*>(expr));
         case ExprType::CALL: return visit_call(*static_cast<CallExpr*>(expr));
+        case ExprType::ARRAY_LITERAL: return visit_array_literal(*static_cast<ArrayLiteralExpr*>(expr));
+        case ExprType::INDEX: return visit_index(*static_cast<IndexExpr*>(expr));
         default: throw std::runtime_error("Unknown expression type");
     }
 }
@@ -116,10 +119,46 @@ Executor::Value Executor::visit_literal(const LiteralExpr& expr) {
     switch (token.get_type()) {
         case TokenType::NUMBER: return token.get_double();
         case TokenType::STRING_LITERAL: return token.get_string();
+        case TokenType::TYPE_ARRAY_NUMBER : return token.get_array();
         case TokenType::TRUE_LITERAL: return true;
         case TokenType::FALSE_LITERAL: return false;
         default: throw std::runtime_error("Invalid literal type");
     }
+}
+
+Executor::Value Executor::visit_array_literal(const ArrayLiteralExpr& expr) {
+    std::vector<double> elements;
+    for (const auto& element_expr : expr.elements) {
+        Value element_value = visit(element_expr.get());
+        if (!std::holds_alternative<double>(element_value)) {
+            throw std::runtime_error("Array elements must be numbers");
+        }
+        elements.push_back(std::get<double>(element_value));
+    }
+    return elements;
+}
+
+// Adicione esta função para visitar index expressions
+Executor::Value Executor::visit_index(const IndexExpr& expr) {
+    Value array_value = visit(expr.object.get());
+    Value index_value = visit(expr.index_expr.get());
+    
+    if (!is_array(array_value)) {
+        throw std::runtime_error("Cannot index non-array value");
+    }
+    
+    if (!std::holds_alternative<double>(index_value)) {
+        throw std::runtime_error("Array index must be a number");
+    }
+    
+    const auto& array = std::get<std::vector<double>>(array_value);
+    double index = std::get<double>(index_value);
+    
+    if (index < 0 || index >= array.size()) {
+        throw std::runtime_error("Array index out of bounds");
+    }
+    
+    return array[static_cast<size_t>(index)];
 }
 
 Executor::Value Executor::visit_variable(const VariableExpr& expr) {
@@ -229,51 +268,70 @@ Executor::Value Executor::visit_call(CallExpr& expr) {
             for (auto& arg : expr.arguments) { 
                 Value value = visit(arg.get()); 
                 if (std::holds_alternative<double>(value)) {
-                    output += std::to_string(std::get<double>(value));
+
+                    double number = std::get<double>(value);
+                    const double epsilon = 1e-12;
+
+                    if (std::abs(number) < epsilon) {
+                        std::ostringstream oss;
+                        oss << std::setprecision(17) << std::scientific << number;
+                        output += oss.str();
+                    } else {
+                        output += std::to_string(std::get<double>(value));
+                    }
                 } else if (std::holds_alternative<std::string>(value)) {
                     output += std::get<std::string>(value);
                 } else if (std::holds_alternative<bool>(value)) {
                     output += std::get<bool>(value) ? "true" : "false";
+                } else if (is_array(value)) {
+                    const auto& arr = std::get<std::vector<double>>(value);
+                    output += "[";
+                    for (size_t i = 0; i < arr.size(); ++i) {
+                        if (i > 0) output += ", ";
+                        output += std::to_string(arr[i]);
+                    }
+                    output += "]";
                 }
             }
             std::cout << output << std::endl; 
             return Value{output}; // Retorna a string impressa
         }
 
-    if (func_name == "isalpha") {
-        if (expr.arguments.size() != 1) {
-            throw std::runtime_error("isalpha requer exatamente 1 argumento");
+        if (func_name == "isalpha") {
+            if (expr.arguments.size() != 1) {
+                throw std::runtime_error("isalpha requer exatamente 1 argumento");
+            }
+            Value arg = visit(expr.arguments[0].get());
+            if (!std::holds_alternative<std::string>(arg)) {
+                throw std::runtime_error("Argumento de isalpha deve ser string");
+            }
+            std::string s = std::get<std::string>(arg);
+            return Value{s.length() == 1 && isalpha(s[0])};
         }
-        Value arg = visit(expr.arguments[0].get());
-        if (!std::holds_alternative<std::string>(arg)) {
-            throw std::runtime_error("Argumento de isalpha deve ser string");
-        }
-        std::string s = std::get<std::string>(arg);
-        return Value{s.length() == 1 && isalpha(s[0])};
-    }
 
-    if (func_name == "isnum") {
-        if (expr.arguments.size() != 1) {
-            throw std::runtime_error("isnum requer exatamente 1 argumento");
+        if (func_name == "isnum") {
+            if (expr.arguments.size() != 1) {
+                throw std::runtime_error("isnum requer exatamente 1 argumento");
+            }
+            Value arg = visit(expr.arguments[0].get());
+            if (!std::holds_alternative<std::string>(arg)) {
+                throw std::runtime_error("Argumento de isnum deve ser string");
+            }
+            std::string s = std::get<std::string>(arg);
+            return Value{s.length() == 1 && isdigit(s[0])};
         }
-        Value arg = visit(expr.arguments[0].get());
-        if (!std::holds_alternative<std::string>(arg)) {
-            throw std::runtime_error("Argumento de isnum deve ser string");
-        }
-        std::string s = std::get<std::string>(arg);
-        return Value{s.length() == 1 && isdigit(s[0])};
-    }
 
-    if (func_name == "len") {
-        if (expr.arguments.size() != 1) {
-            throw std::runtime_error("len requer exatamente 1 argumento");
+        if (func_name == "len") {
+            if (expr.arguments.size() != 1) {
+                throw std::runtime_error("len requer exatamente 1 argumento");
+            }
+            Value arg = visit(expr.arguments[0].get());
+            if (std::holds_alternative<std::string>(arg)) {
+                return Value{static_cast<double>(std::get<std::string>(arg).length())};
+            }
+            throw std::runtime_error("len só suporta strings");
         }
-        Value arg = visit(expr.arguments[0].get());
-        if (std::holds_alternative<std::string>(arg)) {
-            return Value{static_cast<double>(std::get<std::string>(arg).length())};
-        }
-        throw std::runtime_error("len só suporta strings");
-    }
+        if ()
 
         auto it = table_function.find(func_name); 
         if (it == table_function.end()) { 
@@ -365,6 +423,7 @@ void Executor::visit_declaration(const DeclarationStmt& stmt) {
             case TokenType::TYPE_NUMBER: value = Value{0.0}; break;
             case TokenType::TYPE_STRING: value = Value{""}; break;
             case TokenType::TYPE_BOOL: value = Value{false}; break;
+            case TokenType::TYPE_ARRAY_NUMBER: value = Value{std::vector<double>()}; break;
             default: value = Value{};
         }
     }
@@ -638,12 +697,15 @@ void Executor::visit_cchannel(const CChannelStmt& stmt) {
 
             try {
                 // Chamar a função com a mensagem recebida
+                std::vector<std::unique_ptr<Expr>> args;
+                args.push_back(std::make_unique<LiteralExpr>(
+                    Token(TokenType::STRING_LITERAL, message, 0, 0)
+                ));
+
                 CallExpr call(
                     std::make_unique<VariableExpr>(function->name),
                     function->name, // Token fictício para o parêntese
-                    {std::make_unique<LiteralExpr>(
-                        Token(TokenType::STRING_LITERAL, message, 0, 0)
-                    )}
+                    std::move(args)
                 );
 
                 Value result = visit_call(call);
@@ -716,4 +778,8 @@ void Executor::check_numeric_operands(const Token& op, const Value& left, const 
     if (!std::holds_alternative<double>(left) || !std::holds_alternative<double>(right)) {
         throw std::runtime_error("Operands must be numbers for operator " + op.get_lexeme());
     }
+}
+
+bool Executor::is_array(const Value& value) {
+    return std::holds_alternative<std::vector<double>>(value);
 }

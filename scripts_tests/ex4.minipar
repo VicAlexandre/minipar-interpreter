@@ -1,0 +1,7 @@
+nome: string = "CALCULADORA"
+
+i: number = 0
+
+for (i = 0; i < len(nome); i = i + 1) {
+    print(nome[i])
+}

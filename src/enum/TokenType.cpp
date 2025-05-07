@@ -31,7 +31,7 @@ std::string to_str(TokenType type) {
     return "%";
   case TokenType::COLON:
     return ":";
-  case TokenType::SEMICOLON: 
+  case TokenType::SEMICOLON:
     return ";";
   case TokenType::ARROW:
     return "->";
@@ -60,7 +60,7 @@ std::string to_str(TokenType type) {
   case TokenType::IDENTIFIER:
     return "IDENTIFIER";
   case TokenType::NUMBER:
-    return "NUMBER";
+    return "NUMBER_LITERAL";
   case TokenType::STRING_LITERAL:
     return "STRING_LITERAL";
 
@@ -74,7 +74,7 @@ std::string to_str(TokenType type) {
     return "ELSE";
   case TokenType::WHILE:
     return "WHILE";
-  case TokenType::FOR: 
+  case TokenType::FOR:
     return "FOR";
   case TokenType::RETURN:
     return "RETURN";
@@ -86,19 +86,23 @@ std::string to_str(TokenType type) {
     return "FUNC";
   case TokenType::C_CHANNEL:
     return "C_CHANNEL";
-  case TokenType::TYPE_NUMBER:
-    return "TYPE_NUMBER";
-  case TokenType::TYPE_BOOL:
-    return "TYPE_BOOL";
-  case TokenType::TYPE_STRING:
-    return "TYPE_STRING";
-  case TokenType::TRUE_LITERAL:
-    return "TRUE_LITERAL";
-  case TokenType::FALSE_LITERAL:
-    return "FALSE_LITERAL";
 
+  case TokenType::TYPE_NUMBER:
+    return "number";
+  case TokenType::TYPE_BOOL:
+    return "bool";
+  case TokenType::TYPE_STRING:
+    return "string";
+  case TokenType::TYPE_ARRAY_NUMBER:
+    return "array_number";
+  case TokenType::TRUE_LITERAL:
+    return "true";
+  case TokenType::FALSE_LITERAL:
+    return "false";
+  case TokenType::TYPE_NONE:
+    return "void";
   case TokenType::END_OF_FILE:
     return "END_OF_FILE";
   }
-  return "UNKNOWN_TOKEN";
+  return "UNKNOWN_TOKEN_TYPE_(" + std::to_string(static_cast<int>(type)) + ")";
 }

@@ -42,8 +42,4 @@ func main() -> number {
       print(contador)
       contador = contador + 1
   }
-
-  return 0 # Retorno padrão para main
 }
-
-x:

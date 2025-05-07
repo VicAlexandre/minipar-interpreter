@@ -12,7 +12,7 @@
 
 class Executor {
 public:
-    using Value = std::variant<int, double, bool, std::string>;
+    using Value = std::variant<double, std::string, bool, std::vector<double>>;
     
     Executor();
 
@@ -47,9 +47,12 @@ private:
     // Funções auxiliares
     void push_scope();
     void pop_scope();
+
+    bool is_array(const Value& value);
     void declare_variable(const std::string& name, const Value& value);
     Value* find_variable(const std::string& name);
     Value* find_function(const std::string& name);
+    Value visit_array_literal(const ArrayLiteralExpr& expr);
     
     // Métodos de visita
     Value visit(Expr* expr);

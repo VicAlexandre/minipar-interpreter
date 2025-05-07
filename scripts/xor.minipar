@@ -1,0 +1,149 @@
+func sigmoid(x: number) -> number {
+    return 1 / (1 + exp(-x))
+}
+
+func sigmoid_derivative(x: number) -> number {
+    y : number = 1 - x
+    z : number =  x * y
+    return z
+}
+
+# Dados de entrada (função XOR)
+test: array = [0, 0]
+test1: array = [0, 1]
+test2: array = [1, 0]
+test3: array = [1, 1]
+
+inputs: array = [test, test1, test2, test3]
+
+# Saídas desejadas (função XOR)
+outputs: array = [0, 1, 1, 0]
+
+# Inicialização dos pesos com valores aleatórios
+weights_input_hidden: array = [
+    [random(), random(), random()],
+    [random(), random(), random()]
+]
+
+weights_hidden_output: array = [random(), random(), random()]
+bias_hidden: array = [random(), random(), random()]
+bias_output: number = random()
+
+# Taxa de aprendizado
+learning_rate: number = 0.2
+
+# Número de iterações
+epoch: number = 0
+while (epoch < 20000) {
+    i: number = 0
+    while (i < len(inputs)) {
+        # Fase de feedforward
+        hidden_layer_input: array = [0, 0, 0, 0]
+        k: number = 0
+        while (k < 3) {
+            j: number = 0
+            sum: number = 0
+            while (j < 2) {
+                sum = sum + inputs[i][j] * weights_input_hidden[j][k]
+                j = j + 1
+            }
+            hidden_layer_input = hidden_layer_input + [sum]
+            k = k + 1
+        }
+
+        hidden_layer_output: array = [0, 0, 0, 0]
+        m: number = 0
+        while (m < 3) {
+            hidden_layer_output = hidden_layer_output + [sigmoid(hidden_layer_input[m] + bias_hidden[m])]
+            m = m + 1
+        }
+
+        output_layer_input: number = 0
+        n: number = 0
+        while (n < 3) {
+            output_layer_input = output_layer_input + hidden_layer_output[n] * weights_hidden_output[n]
+            n = n + 1
+        }
+        output_layer_input = output_layer_input + bias_output
+        predicted_output: number = sigmoid(output_layer_input)
+
+        # Cálculo do erro
+        error: number = outputs[i] - predicted_output
+
+        # Fase de backpropagation
+        d_predicted_output: number = error * sigmoid_derivative(predicted_output)
+
+        d_hidden_layer: array = []
+        p: number = 0
+        while (p < 3) {
+            d_hidden_layer = d_hidden_layer + [d_predicted_output * weights_hidden_output[p] * sigmoid_derivative(hidden_layer_output[p])]
+            p = p + 1
+        }
+
+        # Atualização dos pesos e bias
+        q: number = 0
+        while (q < 3) {
+            weights_hidden_output[q] = weights_hidden_output[q] + hidden_layer_output[q] 
+            weights_hidden_output[q] = weights_hidden_output[q] * d_predicted_output * learning_rate
+            q = q + 1
+        }
+        bias_output = bias_output + d_predicted_output * learning_rate
+
+        r: number = 0
+        while (r < 2) {
+            s: number = 0
+            while (s < 3) {
+                weights_input_hidden[r][s] = weights_input_hidden[r][s] + inputs[i][r] * d_hidden_layer[s] * learning_rate
+                s = s + 1
+            }
+            r = r + 1
+        }
+
+        t: number = 0
+        while (t < 3) {
+            bias_hidden[t] = bias_hidden[t] + d_hidden_layer[t] * learning_rate
+            t = t + 1
+        }
+
+        i = i + 1
+    }
+    epoch = epoch + 1
+}
+
+# Testando a rede neural treinada
+print("Resultados após o treinamento:")
+u: number = 0
+while (u < len(inputs)) {
+    # Fase de feedforward para teste
+    hidden_layer_input_test: array = []
+    v: number = 0
+    while (v < 3) {
+        w: number = 0
+        sum_test: number = 0
+        while (w < 2) {
+            sum_test = sum_test + inputs[u][w] * weights_input_hidden[w][v]
+            w = w + 1
+        }
+        hidden_layer_input_test = hidden_layer_input_test + [sum_test]
+        v = v + 1
+    }
+
+    hidden_layer_output_test: array = []
+    x: number = 0
+    while (x < 3) {
+        hidden_layer_output_test = hidden_layer_output_test + [sigmoid(hidden_layer_input_test[x] + bias_hidden[x])]
+        x = x + 1
+    }
+
+    output_layer_input_test: number = 0
+    y: number = 0
+    while (y < 3) {
+        output_layer_input_test = output_layer_input_test + hidden_layer_output_test[y] * weights_hidden_output[y]
+        y = y + 1
+    }
+    output_layer_input_test = output_layer_input_test + bias_output
+    predicted_output_test: number = sigmoid(output_layer_input_test)
+
+    print("Input: ", inputs[u], ", Predicted Output: ", predicted_output_test)
+    u = u + 1
+}
