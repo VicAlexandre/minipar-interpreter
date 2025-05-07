@@ -32,6 +32,7 @@ func calc(message: string) -> string{
   return to_string(result)
 }
 
-
 description: string = "CALCULADORA SIMPLES"
-c_channel server {calc, "localhost", 8585}
+host_address: string = "127.0.0.1"
+
+c_channel calc description host_address

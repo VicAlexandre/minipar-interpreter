@@ -64,7 +64,7 @@ private:
   StepResult parse_par_stmt();
   StepResult parse_c_channel_stmt();
   StepResult parse_declaration_stmt();
-  StepResult parse_assignment();
+  StepResult parse_specific_assignment_for_for_loop();
   StepResult parse_return_stmt();
   StepResult parse_break_stmt();
   StepResult parse_continue_stmt();

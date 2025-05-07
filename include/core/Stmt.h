@@ -44,7 +44,8 @@ struct DeclarationStmt {
 };
 
 struct AssignmentStmt {
-    Token identifier;
+    ExprPtr target;
+    Token equals_token;
     std::unique_ptr<Expr> value;
 };
 
@@ -152,7 +153,7 @@ public:
             if constexpr (std::is_same_v<T, DeclarationStmt>) {
                 return arg.identifier;
             } else if constexpr (std::is_same_v<T, AssignmentStmt>) {
-                return arg.identifier;
+                return arg.equals_token;
             } else if constexpr (std::is_same_v<T, ReturnStmt>) {
                 if (arg.value) {
                     return arg.value->get_token();

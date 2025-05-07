@@ -430,11 +430,59 @@ void Executor::visit_declaration(const DeclarationStmt& stmt) {
 }
 
 void Executor::visit_assignment(const AssignmentStmt& stmt) {
-    Value* var = find_variable(stmt.identifier.get_lexeme());
-    if (!var) {
-        throw std::runtime_error("Undefined assignment '" + stmt.identifier.get_lexeme() + "'");
+    Value rvalue = visit(stmt.value.get());
+
+    if (stmt.target->get_type() == ExprType::VARIABLE) {
+        const VariableExpr* var_expr = static_cast<const VariableExpr*>(stmt.target.get());
+        Value* var_ptr = find_variable(var_expr->name.get_lexeme());
+        if (!var_ptr) {
+            throw std::runtime_error("Undefined variable in assignment '" + var_expr->name.get_lexeme() + "'");
+        }
+        *var_ptr = rvalue;
+
+    } else if (stmt.target->get_type() == ExprType::INDEX) {
+        const IndexExpr* index_expr = static_cast<const IndexExpr*>(stmt.target.get());
+        Value array_object_val = visit(index_expr->object.get());
+        Value index_val = visit(index_expr->index_expr.get());
+
+        if (!std::holds_alternative<std::vector<double>>(array_object_val)) {
+            throw std::runtime_error("Cannot assign to indexed element of non-array type.");
+        }
+
+        if (!std::holds_alternative<double>(index_val)) {
+            throw std::runtime_error("Array index must evaluate to a number.");
+        }
+
+        std::vector<double>* array_ptr = std::get_if<std::vector<double>>(&array_object_val);
+        Value* var_containing_array_ptr = nullptr;
+        if (index_expr->object->get_type() == ExprType::VARIABLE) {
+            const VariableExpr* array_var_expr = static_cast<const VariableExpr*>(index_expr->object.get());
+            var_containing_array_ptr = find_variable(array_var_expr->name.get_lexeme());
+            if (!var_containing_array_ptr || !std::holds_alternative<std::vector<double>>(*var_containing_array_ptr)) {
+                 throw std::runtime_error("Array variable '" + array_var_expr->name.get_lexeme() + "' not found or not an array.");
+            }
+        } else {
+            throw std::runtime_error("Complex array targets not supported for assignment yet (e.g. function_call()[index] = value).");
+        }
+
+        std::vector<double>& actual_array = std::get<std::vector<double>>(*var_containing_array_ptr);
+        double idx_double = std::get<double>(index_val);
+        size_t index = static_cast<size_t>(idx_double);
+
+        if (idx_double < 0 || index >= actual_array.size()) {
+            throw std::runtime_error("Array index out of bounds in assignment.");
+        }
+
+        if (!std::holds_alternative<double>(rvalue)) {
+            throw std::runtime_error("Cannot assign non-number value to an element of array_number.");
+        }
+        actual_array[index] = std::get<double>(rvalue);
+
+    } else if (stmt.target->get_type() == ExprType::GET) {
+        throw std::runtime_error("Assignment to object properties (GetExpr) not yet implemented.");
+    } else {
+        throw std::runtime_error("Invalid target for assignment.");
     }
-    *var = visit(stmt.value.get());
 }
 
 void Executor::visit_return(const ReturnStmt& stmt) {
@@ -750,13 +798,15 @@ bool Executor::is_truthy(const Value& value) {
 }
 
 bool Executor::is_equal(const Value& a, const Value& b) {
-    if (std::holds_alternative<double>(a) || std::holds_alternative<double>(b)) {
+    if (std::holds_alternative<double>(a) && std::holds_alternative<double>(b)) {
         double val_a = std::get<double>(a);
         double val_b = std::get<double>(b);
-        // Comparação com epsilon para números de ponto flutuante
-        const long double epsilon = 1e-10;
-
-        return val_a == val_b;
+        const double epsilon = 1e-9;
+        return std::abs(val_a - val_b) < epsilon;
+    }
+    
+    if (std::holds_alternative<double>(a) || std::holds_alternative<double>(b)){
+         return false;
     }
     if (std::holds_alternative<bool>(a) && std::holds_alternative<bool>(b)) {
         return std::get<bool>(a) == std::get<bool>(b);

@@ -1,149 +1,243 @@
+# -----------------------------------------------------------------------------
+# Minipar Script: XOR Neural Network Training
+# (Nota: Ponto e vírgula não são usados como terminadores de linha em Minipar)
+# -----------------------------------------------------------------------------
+# IMPORTANT ASSUMPTIONS:
+# 1. Built-in functions `exp(number) -> number` and `random() -> number`
+#    MUST be added to the Minipar C++ interpreter (SemanticAnalyzer & Executor).
+# 2. Built-in function `len(array) -> number` MUST work for arrays.
+# 3. Minipar currently only supports flat arrays of numbers (`array`).
+#    Therefore, 2D arrays from Python (inputs, weights_input_hidden) are
+#    "flattened" into 1D arrays. Indexing requires manual calculation.
+#    - inputs (4x2) -> inputs_flat (size 8): element [i][j] is at index i*2 + j
+#    - weights_input_hidden (2x3) -> w_ih_flat (size 6): element [j][k] is at index j*3 + k
+# 4. Array assignment `array[index] = value` is assumed to work after recent
+#    interpreter fixes.
+# -----------------------------------------------------------------------------
+
+# --- Helper Functions ---
+
+# Sigmoid activation function
+# REQUIRES: Built-in 'exp(number) -> number' function in the interpreter.
 func sigmoid(x: number) -> number {
-    return 1 / (1 + exp(-x))
+  return 1.0 / (1.0 + exp(-x))
 }
 
+# Derivative of the sigmoid function
 func sigmoid_derivative(x: number) -> number {
-    y : number = 1 - x
-    z : number =  x * y
-    return z
+  # Note: This assumes 'x' is already the *output* of sigmoid(y),
+  # so the derivative is sigmoid(y) * (1 - sigmoid(y)) which is x * (1 - x).
+  return x * (1.0 - x)
 }
 
-# Dados de entrada (função XOR)
-test: array = [0, 0]
-test1: array = [0, 1]
-test2: array = [1, 0]
-test3: array = [1, 1]
+# --- Data Setup ---
 
-inputs: array = [test, test1, test2, test3]
+# Input data for XOR (flattened 4x2 array into 1x8)
+# [0,0], [0,1], [1,0], [1,1]
+inputs_flat: array = [0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0]
+INPUT_DIM: number = 2 # Number of features per input sample
+NUM_SAMPLES: number = 4 # Number of input samples
 
-# Saídas desejadas (função XOR)
-outputs: array = [0, 1, 1, 0]
+# Desired outputs for XOR
+outputs: array = [0.0, 1.0, 1.0, 0.0]
 
-# Inicialização dos pesos com valores aleatórios
-weights_input_hidden: array = [
-    [random(), random(), random()],
-    [random(), random(), random()]
+# --- Network Parameters ---
+HIDDEN_DIM: number = 3
+OUTPUT_DIM: number = 1 # Single output neuron
+
+# --- Weight and Bias Initialization ---
+# REQUIRES: Built-in 'random() -> number' function (returning 0.0 to 1.0).
+
+# Weights: Input -> Hidden (flattened 2x3 array into 1x6)
+# Access weight from input j to hidden k as: w_ih_flat[j * HIDDEN_DIM + k]
+w_ih_flat: array = [
+  random(), random(), random(), # Weights from input 0 to hidden 0, 1, 2
+  random(), random(), random()  # Weights from input 1 to hidden 0, 1, 2
 ]
 
-weights_hidden_output: array = [random(), random(), random()]
+# Weights: Hidden -> Output (1x3 array)
+# Access weight from hidden k to output as: w_ho[k]
+w_ho: array = [random(), random(), random()]
+
+# Biases for hidden layer (1x3 array)
 bias_hidden: array = [random(), random(), random()]
+
+# Bias for output layer (scalar)
 bias_output: number = random()
 
-# Taxa de aprendizado
+# --- Training Parameters ---
 learning_rate: number = 0.2
+epochs: number = 20000 # Number of training iterations
 
-# Número de iterações
+# --- Training Loop ---
 epoch: number = 0
-while (epoch < 20000) {
-    i: number = 0
-    while (i < len(inputs)) {
-        # Fase de feedforward
-        hidden_layer_input: array = [0, 0, 0, 0]
-        k: number = 0
-        while (k < 3) {
-            j: number = 0
-            sum: number = 0
-            while (j < 2) {
-                sum = sum + inputs[i][j] * weights_input_hidden[j][k]
-                j = j + 1
-            }
-            hidden_layer_input = hidden_layer_input + [sum]
-            k = k + 1
-        }
+while (epoch < epochs) {
+  sample_idx: number = 0 # Index for the current input sample (0 to NUM_SAMPLES-1)
 
-        hidden_layer_output: array = [0, 0, 0, 0]
-        m: number = 0
-        while (m < 3) {
-            hidden_layer_output = hidden_layer_output + [sigmoid(hidden_layer_input[m] + bias_hidden[m])]
-            m = m + 1
-        }
+  while (sample_idx < NUM_SAMPLES) {
+    # --- Feedforward ---
 
-        output_layer_input: number = 0
-        n: number = 0
-        while (n < 3) {
-            output_layer_input = output_layer_input + hidden_layer_output[n] * weights_hidden_output[n]
-            n = n + 1
-        }
-        output_layer_input = output_layer_input + bias_output
-        predicted_output: number = sigmoid(output_layer_input)
-
-        # Cálculo do erro
-        error: number = outputs[i] - predicted_output
-
-        # Fase de backpropagation
-        d_predicted_output: number = error * sigmoid_derivative(predicted_output)
-
-        d_hidden_layer: array = []
-        p: number = 0
-        while (p < 3) {
-            d_hidden_layer = d_hidden_layer + [d_predicted_output * weights_hidden_output[p] * sigmoid_derivative(hidden_layer_output[p])]
-            p = p + 1
-        }
-
-        # Atualização dos pesos e bias
-        q: number = 0
-        while (q < 3) {
-            weights_hidden_output[q] = weights_hidden_output[q] + hidden_layer_output[q] 
-            weights_hidden_output[q] = weights_hidden_output[q] * d_predicted_output * learning_rate
-            q = q + 1
-        }
-        bias_output = bias_output + d_predicted_output * learning_rate
-
-        r: number = 0
-        while (r < 2) {
-            s: number = 0
-            while (s < 3) {
-                weights_input_hidden[r][s] = weights_input_hidden[r][s] + inputs[i][r] * d_hidden_layer[s] * learning_rate
-                s = s + 1
-            }
-            r = r + 1
-        }
-
-        t: number = 0
-        while (t < 3) {
-            bias_hidden[t] = bias_hidden[t] + d_hidden_layer[t] * learning_rate
-            t = t + 1
-        }
-
-        i = i + 1
+    # 1. Calculate Hidden Layer Input
+    # hidden_input[k] = sum(inputs[sample][j] * w_ih[j][k] for j in 0..INPUT_DIM-1) + bias_hidden[k]
+    hidden_layer_input: array = [0.0, 0.0, 0.0] # Size HIDDEN_DIM
+    k_hid: number = 0 # Hidden neuron index
+    while (k_hid < HIDDEN_DIM) {
+      sum_h: number = 0.0
+      j_in: number = 0 # Input feature index
+      while (j_in < INPUT_DIM) {
+        # Access flattened arrays:
+        input_val: number = inputs_flat[sample_idx * INPUT_DIM + j_in]
+        weight_val: number = w_ih_flat[j_in * HIDDEN_DIM + k_hid]
+        sum_h = sum_h + input_val * weight_val
+        j_in = j_in + 1
+      }
+      # Assign to hidden_layer_input (using array assignment)
+      hidden_layer_input[k_hid] = sum_h + bias_hidden[k_hid]
+      k_hid = k_hid + 1
     }
-    epoch = epoch + 1
+
+    # 2. Calculate Hidden Layer Output (apply sigmoid)
+    hidden_layer_output: array = [0.0, 0.0, 0.0] # Size HIDDEN_DIM
+    k_hid_out: number = 0
+    while (k_hid_out < HIDDEN_DIM) {
+      hidden_layer_output[k_hid_out] = sigmoid(hidden_layer_input[k_hid_out])
+      k_hid_out = k_hid_out + 1
+    }
+
+    # 3. Calculate Output Layer Input
+    # output_input = sum(hidden_output[k] * w_ho[k] for k in 0..HIDDEN_DIM-1) + bias_output
+    output_layer_input: number = 0.0
+    k_out_in: number = 0
+    while (k_out_in < HIDDEN_DIM) {
+      output_layer_input = output_layer_input + hidden_layer_output[k_out_in] * w_ho[k_out_in]
+      k_out_in = k_out_in + 1
+    }
+    output_layer_input = output_layer_input + bias_output
+
+    # 4. Calculate Final Predicted Output (apply sigmoid)
+    predicted_output: number = sigmoid(output_layer_input)
+
+    # --- Backpropagation ---
+
+    # 1. Calculate Output Layer Error
+    target_output: number = outputs[sample_idx]
+    error: number = target_output - predicted_output
+
+    # 2. Calculate Output Layer Delta (gradient)
+    # delta_output = error * sigmoid_derivative(predicted_output)
+    d_predicted_output: number = error * sigmoid_derivative(predicted_output)
+
+    # 3. Calculate Hidden Layer Delta
+    # delta_hidden[k] = delta_output * w_ho[k] * sigmoid_derivative(hidden_output[k])
+    d_hidden_layer: array = [0.0, 0.0, 0.0] # Size HIDDEN_DIM
+    k_delta_hid: number = 0
+    while (k_delta_hid < HIDDEN_DIM) {
+      deriv: number = sigmoid_derivative(hidden_layer_output[k_delta_hid])
+      d_hidden_layer[k_delta_hid] = d_predicted_output * w_ho[k_delta_hid] * deriv
+      k_delta_hid = k_delta_hid + 1
+    }
+
+    # --- Update Weights and Biases ---
+
+    # 1. Update Hidden -> Output weights and bias_output
+    k_update_ho: number = 0
+    while (k_update_ho < HIDDEN_DIM) {
+      # w_ho[k] = w_ho[k] + hidden_output[k] * delta_output * learning_rate
+      w_ho[k_update_ho] = w_ho[k_update_ho] + hidden_layer_output[k_update_ho] * d_predicted_output * learning_rate
+      k_update_ho = k_update_ho + 1
+    }
+    bias_output = bias_output + d_predicted_output * learning_rate
+
+    # 2. Update Input -> Hidden weights and bias_hidden
+    j_update_ih: number = 0 # Input feature index
+    while (j_update_ih < INPUT_DIM) {
+      k_update_ih: number = 0 # Hidden neuron index
+      while (k_update_ih < HIDDEN_DIM) {
+        # Access flattened arrays for update:
+        # w_ih[j][k] = w_ih[j][k] + input[sample][j] * delta_hidden[k] * learning_rate
+        input_val_for_update: number = inputs_flat[sample_idx * INPUT_DIM + j_update_ih]
+        weight_index: number = j_update_ih * HIDDEN_DIM + k_update_ih
+        w_ih_flat[weight_index] = w_ih_flat[weight_index] + input_val_for_update * d_hidden_layer[k_update_ih] * learning_rate
+
+        # Bias update only needs to happen once per hidden neuron per sample
+        if (j_update_ih == 0) { # Update bias only when processing the first input feature
+           bias_hidden[k_update_ih] = bias_hidden[k_update_ih] + d_hidden_layer[k_update_ih] * learning_rate
+        }
+        k_update_ih = k_update_ih + 1
+      }
+      j_update_ih = j_update_ih + 1
+    }
+
+    sample_idx = sample_idx + 1 # Move to the next sample
+  } # End of sample loop
+
+  # Optional: Print progress every N epochs
+  # if (epoch % 1000 == 0) {
+  #   print("Epoch: ", epoch)
+  # }
+
+  epoch = epoch + 1 # Move to the next epoch
+} # End of epoch loop
+
+# --- Testing Phase ---
+print("--- Resultados Apos Treinamento ---")
+test_idx: number = 0
+while (test_idx < NUM_SAMPLES) {
+  # Perform feedforward with the *trained* weights/biases
+
+  # 1. Calculate Hidden Layer Input
+  hidden_input_test: array = [0.0, 0.0, 0.0]
+  k_hid_test: number = 0
+  while (k_hid_test < HIDDEN_DIM) {
+    sum_h_test: number = 0.0
+    j_in_test: number = 0
+    while (j_in_test < INPUT_DIM) {
+      input_val_test: number = inputs_flat[test_idx * INPUT_DIM + j_in_test]
+      weight_val_test: number = w_ih_flat[j_in_test * HIDDEN_DIM + k_hid_test]
+      sum_h_test = sum_h_test + input_val_test * weight_val_test
+      j_in_test = j_in_test + 1
+    }
+    hidden_input_test[k_hid_test] = sum_h_test + bias_hidden[k_hid_test]
+    k_hid_test = k_hid_test + 1
+  }
+
+  # 2. Calculate Hidden Layer Output
+  hidden_output_test: array = [0.0, 0.0, 0.0]
+  k_hid_out_test: number = 0
+  while (k_hid_out_test < HIDDEN_DIM) {
+    hidden_output_test[k_hid_out_test] = sigmoid(hidden_input_test[k_hid_out_test])
+    k_hid_out_test = k_hid_out_test + 1
+  }
+
+  # 3. Calculate Output Layer Input
+  output_input_test: number = 0.0
+  k_out_in_test: number = 0
+  while (k_out_in_test < HIDDEN_DIM) {
+    output_input_test = output_input_test + hidden_output_test[k_out_in_test] * w_ho[k_out_in_test]
+    k_out_in_test = k_out_in_test + 1
+  }
+  output_input_test = output_input_test + bias_output
+
+  # 4. Calculate Final Predicted Output
+  predicted_output_test: number = sigmoid(output_input_test)
+
+  # Print the result for this test input
+  # (Requires print to handle multiple arguments and arrays)
+  # Constructing the input array string manually for printing
+  input_str: string = "["
+  in_j: number = 0
+  while(in_j < INPUT_DIM) {
+      input_val_print: number = inputs_flat[test_idx * INPUT_DIM + in_j]
+      input_str = input_str + to_string(input_val_print) # Assumes to_string works for numbers
+      if (in_j < INPUT_DIM - 1) {
+          input_str = input_str + ", "
+      }
+      in_j = in_j + 1
+  }
+  input_str = input_str + "]"
+
+  print("Input: ", input_str, ", Predicted Output: ", to_string(predicted_output_test))
+
+  test_idx = test_idx + 1
 }
 
-# Testando a rede neural treinada
-print("Resultados após o treinamento:")
-u: number = 0
-while (u < len(inputs)) {
-    # Fase de feedforward para teste
-    hidden_layer_input_test: array = []
-    v: number = 0
-    while (v < 3) {
-        w: number = 0
-        sum_test: number = 0
-        while (w < 2) {
-            sum_test = sum_test + inputs[u][w] * weights_input_hidden[w][v]
-            w = w + 1
-        }
-        hidden_layer_input_test = hidden_layer_input_test + [sum_test]
-        v = v + 1
-    }
-
-    hidden_layer_output_test: array = []
-    x: number = 0
-    while (x < 3) {
-        hidden_layer_output_test = hidden_layer_output_test + [sigmoid(hidden_layer_input_test[x] + bias_hidden[x])]
-        x = x + 1
-    }
-
-    output_layer_input_test: number = 0
-    y: number = 0
-    while (y < 3) {
-        output_layer_input_test = output_layer_input_test + hidden_layer_output_test[y] * weights_hidden_output[y]
-        y = y + 1
-    }
-    output_layer_input_test = output_layer_input_test + bias_output
-    predicted_output_test: number = sigmoid(output_layer_input_test)
-
-    print("Input: ", inputs[u], ", Predicted Output: ", predicted_output_test)
-    u = u + 1
-}

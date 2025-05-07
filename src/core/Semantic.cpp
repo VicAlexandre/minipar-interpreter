@@ -411,39 +411,36 @@ void SemanticAnalyzer::visit_declaration(DeclarationStmt &decl) {
 }
 
 void SemanticAnalyzer::visit_assignment(const AssignmentStmt &assign) {
-  Symbol *symbol = find_symbol(assign.identifier.get_lexeme());
-  if (!symbol) {
-    report_error("Variável '" + assign.identifier.get_lexeme() +
-                     "' não declarada antes da atribuição.",
-                 assign.identifier);
-    return;
-  }
+  Token target_type = visit(assign.target.get());
+    Token value_type = visit(assign.value.get());
 
-  Token value_type = create_type_token(TokenType::TYPE_NONE);
-  if (assign.value) {
-    value_type = visit(assign.value.get());
-    if (value_type.get_type() == TokenType::TYPE_NONE && !errors.empty() &&
-        symbol->type.get_type() != TokenType::TYPE_NONE) {
+    if (target_type.get_type() == TokenType::TYPE_NONE || value_type.get_type() == TokenType::TYPE_NONE) {
+        if (!errors.empty()) return;
     }
-  } else {
-    report_error("Atribuição sem valor para '" +
-                     assign.identifier.get_lexeme() + "' (erro interno).",
-                 assign.identifier);
-    return;
-  }
 
-  if (!check_types(symbol->type, value_type)) {
-    if (!(symbol->type.get_type() == TokenType::TYPE_ARRAY_NUMBER &&
-          value_type.get_type() == TokenType::TYPE_ARRAY_NUMBER &&
-          assign.value->get_type() == ExprType::ARRAY_LITERAL)) {
-      report_error("Tipos incompatíveis na atribuição para '" +
-                       assign.identifier.get_lexeme() +
-                       "'. Variável é do tipo '" + symbol->type.get_lexeme() +
-                       "', mas a expressão é do tipo '" +
-                       value_type.get_lexeme() + "'.",
-                   assign.identifier);
+    ExprType lvalue_actual_type = assign.target->get_type();
+    if (lvalue_actual_type != ExprType::VARIABLE && lvalue_actual_type != ExprType::INDEX && lvalue_actual_type != ExprType::GET) {
+        report_error("Alvo da atribuição semanticamente inválido.", assign.target->get_token());
+        return;
     }
-  }
+
+    if (lvalue_actual_type == ExprType::VARIABLE) {
+        const VariableExpr* var_expr = static_cast<const VariableExpr*>(assign.target.get());
+        Symbol *symbol = find_symbol(var_expr->name.get_lexeme());
+        if (!symbol) {
+            report_error("Variável '" + var_expr->name.get_lexeme() +
+                             "' não declarada antes da atribuição.",
+                         var_expr->name);
+            return;
+        }
+    }
+
+    if (!check_types(target_type, value_type)) {
+        report_error("Tipos incompatíveis na atribuição. Alvo é do tipo '" +
+                         target_type.get_lexeme() + "', mas a expressão é do tipo '" +
+                         value_type.get_lexeme() + "'.",
+                     assign.equals_token);
+    }
 }
 
 void SemanticAnalyzer::visit_return(const ReturnStmt &ret) {

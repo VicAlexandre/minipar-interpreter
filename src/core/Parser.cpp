@@ -163,16 +163,55 @@ StepResult Parser::parse_statement() {
   if (match(TokenType::C_CHANNEL)) {
     return parse_c_channel_stmt();
   }
+
+  unsigned int initial_current = current;
+
   if (check(TokenType::IDENTIFIER)) {
-    if (lookahead_is_declaration()) {
+    if (current + 3 < tokens.size() &&
+        tokens[current + 1].get_type() == TokenType::COLON &&
+        (tokens[current + 2].get_type() == TokenType::TYPE_NUMBER ||
+         tokens[current + 2].get_type() == TokenType::TYPE_BOOL ||
+         tokens[current + 2].get_type() == TokenType::TYPE_STRING ||
+         tokens[current + 2].get_type() == TokenType::TYPE_ARRAY_NUMBER) &&
+        tokens[current + 3].get_type() == TokenType::EQUAL_ASSIGN) {
       return parse_declaration_stmt();
     }
-    if (!is_at_end(current + 1) &&
-        tokens[current + 1].get_type() == TokenType::EQUAL_ASSIGN) {
-      return parse_assignment();
-    }
-    return parse_expression_statement();
   }
+
+  ExprResult expr_res = parse_expression();
+
+  if (expr_res.expression) {
+    if (match(TokenType::EQUAL_ASSIGN)) { 
+      Token equals_token = previous(); 
+      ExprType lvalue_type = expr_res.expression->get_type();
+      if (lvalue_type != ExprType::VARIABLE && lvalue_type != ExprType::INDEX && lvalue_type != ExprType::GET) {
+        Token lvalue_token_for_error = expr_res.expression->get_token();
+        return {nullptr, std::make_unique<Error>("Alvo da atribuição inválido (deve ser variável, índice de array ou propriedade).",
+                                                  lvalue_token_for_error.get_column(),
+                                                  lvalue_token_for_error.get_line())};
+      }
+
+      ExprResult rvalue_res = parse_expression();
+      if (rvalue_res.syntax_error) {
+        return {nullptr, std::move(rvalue_res.syntax_error)};
+      }
+      if (!rvalue_res.expression) {
+        return STMT_PARSER_ERROR("Esperada expressão após '=' na atribuição");
+      }
+
+      return {std::make_unique<Stmt>(AssignmentStmt{
+                  std::move(expr_res.expression), 
+                  equals_token,                    
+                  std::move(rvalue_res.expression) 
+              }),
+              nullptr};
+    } else {
+      return {std::make_unique<Stmt>(ExpressionStmt{std::move(expr_res.expression)}), nullptr};
+    }
+  } else if (expr_res.syntax_error) {
+    current = initial_current;
+  }
+
   if (match(TokenType::RETURN)) {
     return parse_return_stmt();
   }
@@ -182,10 +221,15 @@ StepResult Parser::parse_statement() {
   if (match(TokenType::CONTINUE)) {
     return parse_continue_stmt();
   }
-  if (match(TokenType::LEFT_BRACE)) {
-    rewind(1);
+  if (match(TokenType::LEFT_BRACE)) { 
+    rewind(1); 
     return parse_block();
   }
+  
+  if (expr_res.syntax_error && current == initial_current) { 
+      return {nullptr, std::move(expr_res.syntax_error)};
+  }
+
   return STMT_PARSER_ERROR("Instrução inválida ou inesperada");
 }
 
@@ -394,6 +438,45 @@ StepResult Parser::parse_while_stmt() {
           nullptr};
 }
 
+StepResult Parser::parse_specific_assignment_for_for_loop() {
+    ExprResult lvalue_res = parse_expression();
+    if (lvalue_res.syntax_error) {
+        return {nullptr, std::move(lvalue_res.syntax_error)};
+    }
+    if (!lvalue_res.expression) {
+        return STMT_PARSER_ERROR("Esperada expressão como alvo da atribuição no loop 'for'");
+    }
+
+    ExprType lvalue_type = lvalue_res.expression->get_type();
+    if (lvalue_type != ExprType::VARIABLE && lvalue_type != ExprType::INDEX && lvalue_type != ExprType::GET) {
+        Token lvalue_token_for_error = lvalue_res.expression->get_token();
+        return {nullptr, std::make_unique<Error>("Alvo da atribuição inválido no loop 'for' (deve ser variável, índice de array ou propriedade).",
+                                                  lvalue_token_for_error.get_column(),
+                                                  lvalue_token_for_error.get_line())};
+    }
+
+    if (!match(TokenType::EQUAL_ASSIGN)) {
+        return STMT_PARSER_ERROR("Esperado '=' após alvo da atribuição no loop 'for'");
+    }
+    Token equals_token = previous();
+
+    ExprResult rvalue_res = parse_expression();
+    if (rvalue_res.syntax_error) {
+        return {nullptr, std::move(rvalue_res.syntax_error)};
+    }
+    if (!rvalue_res.expression) {
+        return STMT_PARSER_ERROR("Esperada expressão após '=' na atribuição do loop 'for'");
+    }
+
+    return {std::make_unique<Stmt>(AssignmentStmt{
+                std::move(lvalue_res.expression),
+                equals_token,
+                std::move(rvalue_res.expression)
+            }),
+            nullptr};
+}
+
+
 StepResult Parser::parse_for_stmt() {
   Token for_token = previous();
 
@@ -403,23 +486,13 @@ StepResult Parser::parse_for_stmt() {
 
   std::unique_ptr<Stmt> initializer = nullptr;
   if (peek() != TokenType::SEMICOLON) {
-    if (check(TokenType::IDENTIFIER) && !lookahead_is_declaration()) {
-      StepResult init_res = parse_assignment();
-      if (init_res.syntax_error) {
-        return init_res;
-      }
-      if (!init_res.statement ||
-          init_res.statement->get_type() != StmtType::ASSIGNMENT) {
-        return STMT_PARSER_ERROR(
-            "Erro interno: parse_assignment não retornou atribuição válida "
-            "para inicializador do 'for'");
-      }
-      initializer = std::move(init_res.statement);
-    } else {
-      return STMT_PARSER_ERROR(
-          "Esperado ';' ou atribuição como inicializador do 'for'");
+    StepResult init_res = parse_specific_assignment_for_for_loop();
+    if (init_res.syntax_error) {
+      return init_res;
     }
+    initializer = std::move(init_res.statement);
   }
+
   if (!match(TokenType::SEMICOLON)) {
     return STMT_PARSER_ERROR("Esperado ';' após inicializador do 'for'");
   }
@@ -438,25 +511,12 @@ StepResult Parser::parse_for_stmt() {
   }
 
   std::unique_ptr<Stmt> increment = nullptr;
-
-  if (peek() != TokenType::RIGHT_PAREN) {
-    if (check(TokenType::IDENTIFIER) && !lookahead_is_declaration()) {
-      StepResult incr_res = parse_assignment();
-      if (incr_res.syntax_error) {
-        return incr_res;
-      }
-
-      if (!incr_res.statement ||
-          incr_res.statement->get_type() != StmtType::ASSIGNMENT) {
-        return STMT_PARSER_ERROR("Erro interno: parse_assignment não retornou "
-                                 "atribuição válida para incremento do 'for'");
-      }
-
-      increment = std::move(incr_res.statement);
-    } else {
-      return STMT_PARSER_ERROR(
-          "Esperado ')' ou atribuição como incremento do 'for'");
+  if (peek() != TokenType::RIGHT_PAREN) { 
+    StepResult incr_res = parse_specific_assignment_for_for_loop();
+    if (incr_res.syntax_error) {
+      return incr_res;
     }
+    increment = std::move(incr_res.statement);
   }
 
   if (!match(TokenType::RIGHT_PAREN)) {
@@ -478,7 +538,6 @@ StepResult Parser::parse_for_stmt() {
     return STMT_PARSER_ERROR("Erro interno: parse_block não retornou bloco "
                              "válido para corpo do 'for'");
   }
-
   BlockStmt body_block = body_res.statement->move_block_stmt();
 
   return {std::make_unique<Stmt>(
@@ -522,7 +581,6 @@ StepResult Parser::parse_par_stmt() {
       body_result.statement->get_type() != StmtType::BLOCK) {
     return STMT_PARSER_ERROR("Erro interno: Corpo do 'par' inválido");
   }
-
   BlockStmt body_block = body_result.statement->move_block_stmt();
 
   return {std::make_unique<Stmt>(ParStmt{std::move(body_block)}), nullptr};
@@ -568,7 +626,7 @@ StepResult Parser::parse_declaration_stmt() {
     return STMT_PARSER_ERROR("Esperado tipo ('number', 'bool', 'string', ou "
                              "'array_number') após ':'");
   }
-  Token type = consume();
+  Token type_token = consume();
 
   if (is_at_end() || peek() != TokenType::EQUAL_ASSIGN) {
     return STMT_PARSER_ERROR("Esperado '=' após tipo na declaração");
@@ -582,44 +640,21 @@ StepResult Parser::parse_declaration_stmt() {
   if (expr.syntax_error) {
     return {nullptr, std::move(expr.syntax_error)};
   }
-
-  return {std::make_unique<Stmt>(
-              DeclarationStmt{identifier, type, std::move(expr.expression)}),
-          nullptr};
-}
-
-StepResult Parser::parse_assignment() {
-  if (is_at_end() || peek() != TokenType::IDENTIFIER) {
-    return STMT_PARSER_ERROR(
-        "Erro interno: Esperado identificador no início da atribuição");
-  }
-  Token identifier = consume();
-
-  if (is_at_end() || peek() != TokenType::EQUAL_ASSIGN) {
-    return STMT_PARSER_ERROR("Esperado '=' após identificador '" +
-                             identifier.get_lexeme() + "'");
-  }
-  consume();
-
-  if (is_at_end()) {
-    return STMT_PARSER_ERROR("Esperado expressão após '=' na atribuição");
-  }
-  ExprResult expr = parse_expression();
-  if (expr.syntax_error) {
-    return {nullptr, std::move(expr.syntax_error)};
+  if (!expr.expression){
+      return STMT_PARSER_ERROR("Esperada expressão válida como inicializador na declaração.");
   }
 
   return {std::make_unique<Stmt>(
-              AssignmentStmt{identifier, std::move(expr.expression)}),
+              DeclarationStmt{identifier, type_token, std::move(expr.expression)}),
           nullptr};
 }
 
 StepResult Parser::parse_return_stmt() {
-  ExprResult expr = parse_expression();
-  if (expr.syntax_error) {
-    return {nullptr, std::move(expr.syntax_error)};
+  ExprResult expr_res = parse_expression();
+  if (expr_res.syntax_error) {
+    return {nullptr, std::move(expr_res.syntax_error)};
   }
-  return {std::make_unique<Stmt>(ReturnStmt{std::move(expr.expression)}),
+  return {std::make_unique<Stmt>(ReturnStmt{std::move(expr_res.expression)}),
           nullptr};
 }
 
@@ -636,6 +671,7 @@ StepResult Parser::parse_continue_stmt() {
 }
 
 ExprResult Parser::parse_expression() { return parse_disjunction(); }
+
 ExprResult Parser::parse_disjunction() {
   ExprResult left = parse_conjunction();
   if (left.syntax_error) {
@@ -792,6 +828,9 @@ ExprResult Parser::parse_primary() {
         if (element_expr.syntax_error) {
           return element_expr;
         }
+        if (!element_expr.expression){
+             return EXPR_PARSER_ERROR("Esperada expressão válida como elemento de array.");
+        }
         elements.push_back(std::move(element_expr.expression));
       } while (match(TokenType::COMMA));
     }
@@ -846,6 +885,9 @@ ExprResult Parser::parse_local() {
           if (arg.syntax_error) {
             return arg;
           }
+           if (!arg.expression){
+             return EXPR_PARSER_ERROR("Esperada expressão válida como argumento de função.");
+          }
           args.push_back(std::move(arg.expression));
         } while (match(TokenType::COMMA));
       }
@@ -865,6 +907,9 @@ StepResult Parser::parse_expression_statement() {
   ExprResult expr_res = parse_expression();
   if (expr_res.syntax_error) {
     return {nullptr, std::move(expr_res.syntax_error)};
+  }
+  if (!expr_res.expression) {
+      return STMT_PARSER_ERROR("Esperada uma expressão para um statement de expressão.");
   }
   return {
       std::make_unique<Stmt>(ExpressionStmt{std::move(expr_res.expression)}),
