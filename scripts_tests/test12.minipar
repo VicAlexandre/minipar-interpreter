@@ -14,7 +14,7 @@ func soma_ate(n: number) -> number {
 }
 
 # Função principal
-func main() -> number {
+func main() -> void {
   limite: number = 10
   resultado_soma: number = 0
 
@@ -43,3 +43,5 @@ func main() -> number {
       contador = contador + 1
   }
 }
+
+main()

@@ -402,6 +402,19 @@ Executor::Value Executor::visit_call(CallExpr& expr) {
         auto& param_names = *function->params.param_names;
         for (size_t i = 0; i < param_names.size(); ++i) {
             Value arg_value = visit(expr.arguments[i].get());
+
+            // if (is_array(arg_value)) {
+            //     // Encontra o array original na memória
+            //     if (auto var_expr = dynamic_cast<VariableExpr*>(expr.arguments[i].get())) {
+            //         Value* original_array = find_variable(var_expr->name.get_lexeme());
+            //         if (original_array && is_array(*original_array)) {
+            //             // Armazena uma referência ao array original
+            //             // context.locals[param_names[i].get_lexeme()] = *original_array;
+            //             continue;
+            //         }
+            //     }
+            // }
+            
             context.locals[param_names[i].get_lexeme()] = arg_value;
         }
     }
@@ -520,16 +533,15 @@ void Executor::visit_assignment(const AssignmentStmt& stmt) {
         }
         size_t index = static_cast<size_t>(idx_double);
 
-
         if (index_expr->object->get_type() == ExprType::VARIABLE) {
             const VariableExpr* array_var_expr = static_cast<const VariableExpr*>(index_expr->object.get());
             Value* var_containing_array_ptr = find_variable(array_var_expr->name.get_lexeme());
 
             if (!var_containing_array_ptr) {
-                 throw std::runtime_error("Cannot assign to element of undefined array variable '" + array_var_expr->name.get_lexeme() + "'.");
+                throw std::runtime_error("Cannot assign to element of undefined array variable '" + array_var_expr->name.get_lexeme() + "'.");
             }
-            if (!std::holds_alternative<std::vector<double>>(*var_containing_array_ptr)) {
-                 throw std::runtime_error("Cannot assign to indexed element because variable '" + array_var_expr->name.get_lexeme() + "' is not an array.");
+            if (!is_array(*var_containing_array_ptr)) {
+                throw std::runtime_error("Cannot assign to indexed element because variable '" + array_var_expr->name.get_lexeme() + "' is not an array.");
             }
 
             std::vector<double>& actual_array = std::get<std::vector<double>>(*var_containing_array_ptr);
@@ -543,11 +555,9 @@ void Executor::visit_assignment(const AssignmentStmt& stmt) {
             }
 
             actual_array[index] = std::get<double>(rvalue);
-
         } else {
             throw std::runtime_error("Assignment target must be a variable or an array element accessed via variable (e.g., var[index] = value).");
         }
-
     } else {
         throw std::runtime_error("Invalid target for assignment.");
     }

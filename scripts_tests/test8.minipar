@@ -20,8 +20,8 @@ func teste_fibonacci() -> number {
 
 func main() -> number {
     x: number = teste_fibonacci()
-    z: number = print(x)
-    return z
+    print(x)
+    return x
 }
 
-x: number = main()
+main()

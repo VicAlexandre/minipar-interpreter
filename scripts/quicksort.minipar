@@ -1,10 +1,13 @@
-func swap(arr: array, idx1: number, idx2: number) -> void {
+pi: number = 0
+
+func swap(arr: array, idx1: number, idx2: number) -> array {
   temp: number = arr[idx1]
   arr[idx1] = arr[idx2]
   arr[idx2] = temp
+  return arr
 }
 
-func partition(arr: array, low: number, high: number) -> number {
+func partition(arr: array, low: number, high: number) -> array {
   pivot: number = arr[high]
   i: number = low - 1
 
@@ -12,20 +15,22 @@ func partition(arr: array, low: number, high: number) -> number {
   while (j < high) {
     if (arr[j] <= pivot) {
       i = i + 1
-      swap(arr, i, j)
+      arr = swap(arr, i, j)
     }
     j = j + 1
   }
-  swap(arr, i + 1, high)
-  return i + 1
+  arr = swap(arr, i + 1, high)
+  pi = i + 1
+  return arr
 }
 
-func quicksort_inplace(arr: array, low: number, high: number) -> void {
+func quicksort_inplace(arr: array, low: number, high: number) -> array {
   if (low < high) {
-    pi: number = partition(arr, low, high)
-    quicksort_inplace(arr, low, pi - 1)
-    quicksort_inplace(arr, pi + 1, high)
+    arr = partition(arr, low, high)
+    arr = quicksort_inplace(arr, low, pi - 1)
+    arr = quicksort_inplace(arr, pi + 1, high)
   }
+  return arr
 }
 
 print("==== Ordenacao com Quicksort (In-Place) ====")
@@ -37,6 +42,6 @@ print("Vetor original: ", my_array)
 array_len: number = len(my_array)
 high_index: number = array_len - 1
 
-quicksort_inplace(my_array, 0, high_index)
+sorted :array = quicksort_inplace(my_array, 0, high_index)
 
-print("Vetor ordenado: ", my_array)
+print("Vetor ordenado: ", sorted)

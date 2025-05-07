@@ -33,5 +33,4 @@ func processa_dados(limite: number) -> string {
 }
 
 x: string = processa_dados(12)
-
-y: number = print(x)
+print(x)
