@@ -323,13 +323,17 @@ Executor::Value Executor::visit_call(CallExpr& expr) {
 
         if (func_name == "len") {
             if (expr.arguments.size() != 1) {
-                throw std::runtime_error("len requer exatamente 1 argumento");
+                throw std::runtime_error("len() takes exactly one argument (" + std::to_string(expr.arguments.size()) + " given)");
             }
             Value arg = visit(expr.arguments[0].get());
             if (std::holds_alternative<std::string>(arg)) {
                 return Value{static_cast<double>(std::get<std::string>(arg).length())};
+            } else if (is_array(arg)) {
+                const auto& arr = std::get<std::vector<double>>(arg);
+                return Value{static_cast<double>(arr.size())};
+            } else {
+                throw std::runtime_error("len() argument must be a string or an array");
             }
-            throw std::runtime_error("len só suporta strings");
         }
 
         auto it = table_function.find(func_name); 

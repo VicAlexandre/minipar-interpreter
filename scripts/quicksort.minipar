@@ -1,0 +1,42 @@
+func swap(arr: array, idx1: number, idx2: number) -> void {
+  temp: number = arr[idx1]
+  arr[idx1] = arr[idx2]
+  arr[idx2] = temp
+}
+
+func partition(arr: array, low: number, high: number) -> number {
+  pivot: number = arr[high]
+  i: number = low - 1
+
+  j: number = low
+  while (j < high) {
+    if (arr[j] <= pivot) {
+      i = i + 1
+      swap(arr, i, j)
+    }
+    j = j + 1
+  }
+  swap(arr, i + 1, high)
+  return i + 1
+}
+
+func quicksort_inplace(arr: array, low: number, high: number) -> void {
+  if (low < high) {
+    pi: number = partition(arr, low, high)
+    quicksort_inplace(arr, low, pi - 1)
+    quicksort_inplace(arr, pi + 1, high)
+  }
+}
+
+print("==== Ordenacao com Quicksort (In-Place) ====")
+
+my_array: array = [5.0, 1.0, 9.0, 3.0, 7.0, 4.0, 8.0, 6.0, 2.0]
+
+print("Vetor original: ", my_array)
+
+array_len: number = len(my_array)
+high_index: number = array_len - 1
+
+quicksort_inplace(my_array, 0, high_index)
+
+print("Vetor ordenado: ", my_array)
