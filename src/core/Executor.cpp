@@ -18,7 +18,6 @@
 #include <string.h>    
 #include <atomic>     
 
-// Includes para Sockets (POSIX)
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h> 
@@ -597,7 +596,7 @@ void Executor::visit_declaration(const DeclarationStmt &stmt) {
   if (stmt.initializer) {
     initial_value = visit(stmt.initializer.get());
   } else {
-    // Analisador semântico deve garantir que inicializadores existam se a linguagem os requer.
+    
     throw std::runtime_error("Variable declaration without initializer: '" + stmt.identifier.get_lexeme() + "'.");
   }
   declare_variable(stmt.identifier.get_lexeme(), initial_value);
@@ -701,11 +700,11 @@ void Executor::visit_continue(const ContinueStmt &) {
 }
 
 void Executor::visit_function(const FunctionStmt &) {
-  // Definição de função: nenhuma ação em tempo de execução aqui, já foi registrada.
+  
 }
 
 void Executor::visit_seq(const SeqStmt &stmt) {
-  // Bloco SEQ é tratado como um bloco normal na execução
+  
   visit_block(stmt.body);
 }
 
@@ -792,21 +791,15 @@ void Executor::visit_cchannel(const CChannelStmt &stmt) {
             << ") running on " << host_address_str << ":" << port_num_cchannel << std::endl;
   std::cout << "Description: " << description_str << std::endl;
 
-  // Thread do servidor de c_channel (desanexada)
-  // ATENÇÃO: Capturar 'this' em uma thread desanexada é perigoso se o Executor for destruído.
-  // Para um servidor de longa duração, o Executor precisa viver tanto quanto esta thread.
   std::thread([this, server_fd, handler_function_node = *handler_function_ptr /* Copia o nó da função */, func_name_str = handler_function_ptr->name.get_lexeme()]() {
     while (true) {
       struct sockaddr_in client_addr_cchannel;
       socklen_t client_len_cchannel = sizeof(client_addr_cchannel);
       int client_sock_fd = accept(server_fd, (struct sockaddr *)&client_addr_cchannel, &client_len_cchannel);
       if (client_sock_fd == -1) {
-         // perror("c_channel accept failed"); // Para debug
-         // Se server_fd foi fechado (ex: no destrutor do Executor), accept falhará.
-         // Seria bom ter uma forma de sinalizar o fim do servidor.
-         break; // Sai do loop se accept falhar (ex: socket fechado)
+         break; 
       }
-      // Thread para cada cliente de c_channel (desanexada)
+
       std::thread([this, client_sock_fd, captured_handler_node = handler_function_node, captured_func_name = func_name_str](int sock) {
         char buffer_cchannel[1024] = {0};
         ssize_t bytes_read_cchannel = recv(sock, buffer_cchannel, sizeof(buffer_cchannel) - 1, 0);
@@ -818,7 +811,7 @@ void Executor::visit_cchannel(const CChannelStmt &stmt) {
             if (!captured_handler_node.params.param_names || captured_handler_node.params.param_names->size() != 1) {
               throw std::runtime_error("c_channel handler '" + captured_func_name + "' must accept exactly one string argument.");
             }
-            // Assumindo que o parâmetro do handler é string (semântica deveria verificar)
+            
             
             std::vector<std::unique_ptr<Expr>> args_for_handler;
             args_for_handler.push_back(std::make_unique<LiteralExpr>(Token(TokenType::STRING_LITERAL, message_from_client, 0,0, message_from_client)));
@@ -842,25 +835,22 @@ void Executor::visit_cchannel(const CChannelStmt &stmt) {
           else response_to_client = "<handler_returned_void_or_unsupported_type>";
           send(sock, response_to_client.c_str(), response_to_client.length(), 0);
         }
-        // else if (bytes_read_cchannel == 0) { /* Peer fechou conexão */ }
-        // else { /* perror("c_channel recv failed"); */ }
+
         close(sock);
       }, client_sock_fd).detach();
     }
-    // Se o loop quebrar, fechar o socket do servidor principal de c_channel
-    // close(server_fd); // CUIDADO: Se o Executor for destruído, o destrutor já tentará fechar.
-    //                // Este close aqui só se o loop for quebrado por outra razão que não a destruição do Executor.
+
   }).detach();
 }
 
 
-// --- Funções Helper (is_truthy, is_equal, etc.) ---
+
 bool Executor::is_truthy(const Value &value) {
   if (std::holds_alternative<bool>(value)) return std::get<bool>(value);
   if (std::holds_alternative<double>(value)) return std::get<double>(value) != 0.0;
   if (std::holds_alternative<std::string>(value)) return !std::get<std::string>(value).empty();
   if (is_array(value)) return !std::get<std::vector<double>>(value).empty();
-  return false; // Valor default (void) é falso
+  return false; 
 }
 
 bool Executor::is_equal(const Value &a, const Value &b) {
@@ -877,9 +867,8 @@ bool Executor::is_equal(const Value &a, const Value &b) {
     }
     return true;
   }
-  // Se chegou aqui, pode ser um tipo não tratado ou ambos são o tipo default do variant (se não for um dos acima)
-  // Se Value{} (void) for o único estado restante, e a.index() == b.index(), então são iguais (void == void).
-  return true; // Implica que se os índices são iguais e não é um dos tipos acima, são iguais (ex: void==void)
+
+  return true; 
 }
 
 void Executor::check_numeric_operand(const Token &op, const Value &operand) {
