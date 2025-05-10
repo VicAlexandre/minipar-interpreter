@@ -1,80 +1,112 @@
+// src/core/Executor.cpp
 #include "../include/core/Executor.h"
-#include "../include/core/Error.h"
-#include <arpa/inet.h> 
-#include <cctype>      
-#include <cmath>      
-#include <cstdlib>    
-#include <ctime>     
-#include <future>      
-#include <iomanip>     
-#include <iostream>
-#include <mutex>        
-#include <netinet/in.h> 
-#include <sstream>      
-#include <stdexcept>    
-#include <string.h>     
-#include <sys/socket.h> 
-#include <unistd.h>     
-#include <vector>
+#include "../include/core/Error.h"   
+#include "../include/core/Token.h"  
+#include "../include/core/Expr.h"   
+#include "../include/core/Stmt.h"   
 
-// Flag to ensure srand is called only once
-namespace { // Use an anonymous namespace for internal linkage
+
+#include <cctype>      
+#include <cmath>       
+#include <cstdlib>     
+#include <ctime>       
+#include <future>      
+#include <iomanip>    
+#include <iostream>    
+#include <sstream>     
+#include <stdexcept>   
+#include <string.h>    
+#include <atomic>     
+
+// Includes para Sockets (POSIX)
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h> 
+#include <arpa/inet.h> 
+#include <unistd.h>     
+#include <netdb.h>      
+// #include <fcntl.h>
+
+
+
+namespace { 
 bool srand_called = false;
 }
 
 Executor::Executor() {
-  push_scope();
-  // Seed the random number generator once when the executor is created
+  push_scope(); 
   if (!srand_called) {
-    srand(static_cast<unsigned int>(time(0)));
+    srand(static_cast<unsigned int>(time(nullptr))); 
     srand_called = true;
   }
 }
 
+Executor::~Executor() {
+  
+  for (auto const& pair_handle_fd : active_client_sockets) {
+    close(pair_handle_fd.second); 
+  }
+  active_client_sockets.clear(); 
+}
+
 void Executor::execute(
     const std::vector<std::unique_ptr<Stmt>> &statements,
-    const std::unordered_map<std::string, FunctionStmt *> &function_table) {
-  table_function = function_table;
+    const std::unordered_map<std::string, FunctionStmt *> &function_table_from_semantic) {
+  this->table_function = function_table_from_semantic; 
 
   try {
     for (const auto &stmt : statements) {
-      if (!stmt)
-        continue;
+      if (!stmt) continue; 
       visit(stmt.get());
     }
   } catch (const std::runtime_error &e) {
     std::cerr << "Runtime error: " << e.what() << std::endl;
+    
   }
 }
 
 void Executor::execute_global_calls(Expr *expr) {
-  if (!expr)
-    return;
-
-  if (auto call = dynamic_cast<CallExpr *>(expr)) {
-    visit_call(*call);
-  }
+    
+    if (!expr) return;
+    if (auto call = dynamic_cast<CallExpr *>(expr)) {
+       
+        visit_call(*call);
+    }
 }
 
-void Executor::push_scope() { scopes.emplace_back(); }
+
+void Executor::push_scope() { 
+   
+    scopes.emplace_back(); 
+}
 
 void Executor::pop_scope() {
-  if (!scopes.empty()) {
-    scopes.pop_back();
-  }
+    if (!scopes.empty()) {
+        scopes.pop_back();
+    } else {
+      
+        throw std::runtime_error("Internal error: Attempt to pop an empty scope stack.");
+    }
 }
 
 void Executor::declare_variable(const std::string &name, const Value &value) {
   if (scopes.empty()) {
-    throw std::runtime_error(
-        "Internal error: No active scope to declare variable");
+   
+    throw std::runtime_error("Internal error: No active scope to declare variable '" + name + "'.");
   }
-
-  auto &current_scope = scopes.back();
-  current_scope[name] = value;
+ 
+    if (!functionStack.empty()) {
+        functionStack.top().locals[name] = value;
+    } else if (!scopes.empty()){ 
+        scopes.back()[name] = value;
+    } else {
+        
+         throw std::runtime_error("Internal error: No available scope for variable declaration.");
+    }
 }
 
 Executor::Value *Executor::find_variable(const std::string &name) {
+ 
   if (!functionStack.empty()) {
     auto &locals = functionStack.top().locals;
     auto it = locals.find(name);
@@ -83,80 +115,67 @@ Executor::Value *Executor::find_variable(const std::string &name) {
     }
   }
 
-  for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
-    auto &scope_map = *it;
-    auto found = scope_map.find(name);
-    if (found != scope_map.end()) {
-      return &found->second;
+ 
+  for (auto scope_it = scopes.rbegin(); scope_it != scopes.rend(); ++scope_it) {
+    auto &current_scope_map = *scope_it;
+    auto var_it = current_scope_map.find(name);
+    if (var_it != current_scope_map.end()) {
+      return &(var_it->second);
     }
   }
-
-  return nullptr;
+  return nullptr; // Variável não encontrada
 }
 
 Executor::Value *Executor::find_function(const std::string &name) {
-  auto it = table_function.find(name);
+    
+  auto it = table_function.find(name); 
   if (it != table_function.end()) {
-    return nullptr;
+
+    return nullptr; 
   }
   return nullptr;
 }
 
+
 Executor::Value Executor::visit(Expr *expr) {
   if (!expr) {
-    throw std::runtime_error(
-        "Internal error: Trying to visit a null expression");
+    throw std::runtime_error("Internal error: Trying to visit a null expression");
   }
 
   switch (expr->get_type()) {
-  case ExprType::LITERAL:
-    return visit_literal(*static_cast<LiteralExpr *>(expr));
-  case ExprType::VARIABLE:
-    return visit_variable(*static_cast<VariableExpr *>(expr));
-  case ExprType::BINARY:
-    return visit_binary(*static_cast<BinaryExpr *>(expr));
-  case ExprType::UNARY:
-    return visit_unary(*static_cast<UnaryExpr *>(expr));
-  case ExprType::GROUPING:
-    return visit_grouping(*static_cast<GroupingExpr *>(expr));
-  case ExprType::CALL:
-    return visit_call(*static_cast<CallExpr *>(expr));
-  case ExprType::ARRAY_LITERAL:
-    return visit_array_literal(*static_cast<ArrayLiteralExpr *>(expr));
-  case ExprType::INDEX:
-    return visit_index(*static_cast<IndexExpr *>(expr));
+  case ExprType::LITERAL:        return visit_literal(*static_cast<LiteralExpr *>(expr));
+  case ExprType::VARIABLE:       return visit_variable(*static_cast<VariableExpr *>(expr));
+  case ExprType::BINARY:         return visit_binary(*static_cast<BinaryExpr *>(expr));
+  case ExprType::UNARY:          return visit_unary(*static_cast<UnaryExpr *>(expr));
+  case ExprType::GROUPING:       return visit_grouping(*static_cast<GroupingExpr *>(expr));
+  case ExprType::CALL:           return visit_call(*static_cast<CallExpr *>(expr));
+  case ExprType::ARRAY_LITERAL:  return visit_array_literal(*static_cast<ArrayLiteralExpr *>(expr));
+  case ExprType::INDEX:          return visit_index(*static_cast<IndexExpr *>(expr));
+
   default:
-    throw std::runtime_error(
-        "Unknown or unsupported expression type encountered during execution");
+    throw std::runtime_error("Unknown or unsupported expression type encountered during execution: " + std::to_string(static_cast<int>(expr->get_type())));
   }
 }
 
 Executor::Value Executor::visit_literal(const LiteralExpr &expr) {
   const Token &token = expr.value;
-
   switch (token.get_type()) {
-  case TokenType::NUMBER:
-    return token.get_double();
-  case TokenType::STRING_LITERAL:
-    return token.get_string();
-  case TokenType::TRUE_LITERAL:
-    return true;
-  case TokenType::FALSE_LITERAL:
-    return false;
+  case TokenType::NUMBER:         return token.get_double();
+  case TokenType::STRING_LITERAL: return token.get_string();
+  case TokenType::TRUE_LITERAL:   return true;
+  case TokenType::FALSE_LITERAL:  return false;
   default:
-    throw std::runtime_error("Invalid token type for literal expression");
+    throw std::runtime_error("Invalid token type for literal expression: " + token.to_string());
   }
 }
 
 Executor::Value Executor::visit_array_literal(const ArrayLiteralExpr &expr) {
   std::vector<double> elements;
   elements.reserve(expr.elements.size());
-
   for (const auto &element_expr : expr.elements) {
     Value element_value = visit(element_expr.get());
     if (!std::holds_alternative<double>(element_value)) {
-      throw std::runtime_error(
-          "Array literal elements must evaluate to numbers");
+      throw std::runtime_error("Array literal (array_number) elements must evaluate to numbers.");
     }
     elements.push_back(std::get<double>(element_value));
   }
@@ -167,24 +186,31 @@ Executor::Value Executor::visit_index(const IndexExpr &expr) {
   Value object_value = visit(expr.object.get());
   Value index_value = visit(expr.index_expr.get());
 
-  if (!is_array(object_value)) {
-    throw std::runtime_error("Cannot index a non-array value");
+  if (is_array(object_value)) { // Indexando um array_number
+    const auto &array_vec = std::get<std::vector<double>>(object_value);
+    if (!std::holds_alternative<double>(index_value)) {
+      throw std::runtime_error("Array index must evaluate to a number.");
+    }
+    double index_double = std::get<double>(index_value);
+    if (index_double < 0 || index_double >= array_vec.size() || index_double != floor(index_double)) {
+      throw std::runtime_error("Array index out of bounds or not an integer: " + std::to_string(index_double));
+    }
+    size_t valid_index = static_cast<size_t>(index_double);
+    return array_vec[valid_index];
+  } else if (std::holds_alternative<std::string>(object_value)) { // Indexando uma string
+    const auto& str_val = std::get<std::string>(object_value);
+    if (!std::holds_alternative<double>(index_value)) {
+        throw std::runtime_error("String index must evaluate to a number.");
+    }
+    double index_double = std::get<double>(index_value);
+    if (index_double < 0 || index_double >= str_val.length() || index_double != floor(index_double)) {
+         throw std::runtime_error("String index out of bounds or not an integer: " + std::to_string(index_double));
+    }
+    size_t valid_index = static_cast<size_t>(index_double);
+    return std::string(1, str_val[valid_index]); // Retorna o caractere como uma nova string
+  }else {
+    throw std::runtime_error("Cannot index a non-array/non-string value.");
   }
-
-  if (!std::holds_alternative<double>(index_value)) {
-    throw std::runtime_error("Array index must evaluate to a number");
-  }
-
-  const auto &array_vec = std::get<std::vector<double>>(object_value);
-  double index_double = std::get<double>(index_value);
-
-  if (index_double < 0 || index_double >= array_vec.size() ||
-      index_double != floor(index_double)) {
-    throw std::runtime_error("Array index out of bounds or not an integer");
-  }
-  size_t index = static_cast<size_t>(index_double);
-
-  return array_vec[index];
 }
 
 Executor::Value Executor::visit_variable(const VariableExpr &expr) {
@@ -192,103 +218,78 @@ Executor::Value Executor::visit_variable(const VariableExpr &expr) {
   if (var_ptr) {
     return *var_ptr;
   }
-  throw std::runtime_error("Undefined variable '" + expr.name.get_lexeme() +
-                           "'");
+  throw std::runtime_error("Undefined variable '" + expr.name.get_lexeme() + "'.");
 }
 
 Executor::Value Executor::visit_binary(const BinaryExpr &expr) {
   Value left = visit(expr.left.get());
-  Value
-      right; 
-
   TokenType op_type = expr.op.get_type();
 
+  // Avaliação preguiçosa para AND e OR
   if (op_type == TokenType::AND_AND) {
-    if (!is_truthy(left))
-      return false;
-    right = visit(expr.right.get()); 
-    return is_truthy(right);
+    if (!is_truthy(left)) return false;
+    Value right_and = visit(expr.right.get()); // Só avalia se left é truthy
+    return is_truthy(right_and);
   }
   if (op_type == TokenType::OR_OR) {
-    if (is_truthy(left))
-      return true;
-    right = visit(expr.right.get()); 
-    return is_truthy(right);
+    if (is_truthy(left)) return true;
+    Value right_or = visit(expr.right.get()); // Só avalia se left é falsy
+    return is_truthy(right_or);
   }
 
-  right = visit(expr.right.get());
+  Value right = visit(expr.right.get()); // Avalia operando direito para outros operadores
 
-  if (op_type == TokenType::PLUS || op_type == TokenType::MINUS ||
-      op_type == TokenType::STAR || op_type == TokenType::SLASH ||
-      op_type == TokenType::PERCENT) {
-    if (op_type == TokenType::PLUS &&
-        std::holds_alternative<std::string>(left) &&
-        std::holds_alternative<std::string>(right)) {
+  if (op_type == TokenType::PLUS) {
+    if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right)) {
+      return std::get<double>(left) + std::get<double>(right);
+    }
+    if (std::holds_alternative<std::string>(left) && std::holds_alternative<std::string>(right)) {
       return std::get<std::string>(left) + std::get<std::string>(right);
     }
-
+    throw std::runtime_error("Operator '+' requires two numbers or two strings.");
+  }
+  if (op_type == TokenType::MINUS || op_type == TokenType::STAR ||
+      op_type == TokenType::SLASH || op_type == TokenType::PERCENT) {
     check_numeric_operands(expr.op, left, right);
     double left_num = std::get<double>(left);
     double right_num = std::get<double>(right);
-
     switch (op_type) {
-    case TokenType::PLUS:
-      return left_num + right_num;
-    case TokenType::MINUS:
-      return left_num - right_num;
-    case TokenType::STAR:
-      return left_num * right_num;
+    case TokenType::MINUS:  return left_num - right_num;
+    case TokenType::STAR:   return left_num * right_num;
     case TokenType::SLASH:
-      if (right_num == 0.0)
-        throw std::runtime_error("Division by zero");
+      if (right_num == 0.0) throw std::runtime_error("Division by zero.");
       return left_num / right_num;
     case TokenType::PERCENT:
-      if (right_num == 0.0)
-        throw std::runtime_error("Modulo by zero");
+      if (right_num == 0.0) throw std::runtime_error("Modulo by zero.");
       return fmod(left_num, right_num);
-    default:
-      break;
+    default: break; 
     }
   }
 
   if (op_type == TokenType::GREATER || op_type == TokenType::GREATER_EQUAL ||
       op_type == TokenType::LESS || op_type == TokenType::LESS_EQUAL) {
-    if (std::holds_alternative<double>(left) &&
-        std::holds_alternative<double>(right)) {
+    if (std::holds_alternative<double>(left) && std::holds_alternative<double>(right)) {
       double left_num = std::get<double>(left);
       double right_num = std::get<double>(right);
       switch (op_type) {
-      case TokenType::GREATER:
-        return left_num > right_num;
-      case TokenType::GREATER_EQUAL:
-        return left_num >= right_num;
-      case TokenType::LESS:
-        return left_num < right_num;
-      case TokenType::LESS_EQUAL:
-        return left_num <= right_num;
-      default:
-        break;
+      case TokenType::GREATER:        return left_num > right_num;
+      case TokenType::GREATER_EQUAL:  return left_num >= right_num;
+      case TokenType::LESS:           return left_num < right_num;
+      case TokenType::LESS_EQUAL:     return left_num <= right_num;
+      default: break;
       }
-    } else if (std::holds_alternative<std::string>(left) &&
-               std::holds_alternative<std::string>(right)) {
+    } else if (std::holds_alternative<std::string>(left) && std::holds_alternative<std::string>(right)) {
       const std::string &left_str = std::get<std::string>(left);
       const std::string &right_str = std::get<std::string>(right);
       switch (op_type) {
-      case TokenType::GREATER:
-        return left_str > right_str;
-      case TokenType::GREATER_EQUAL:
-        return left_str >= right_str;
-      case TokenType::LESS:
-        return left_str < right_str;
-      case TokenType::LESS_EQUAL:
-        return left_str <= right_str;
-      default:
-        break;
+      case TokenType::GREATER:        return left_str > right_str;
+      case TokenType::GREATER_EQUAL:  return left_str >= right_str;
+      case TokenType::LESS:           return left_str < right_str;
+      case TokenType::LESS_EQUAL:     return left_str <= right_str;
+      default: break;
       }
     } else {
-      throw std::runtime_error("Comparison operators require two numbers or "
-                               "two strings, got incompatible types for " +
-                               expr.op.get_lexeme());
+      throw std::runtime_error("Comparison operators require two numbers or two strings for '" + expr.op.get_lexeme() + "'.");
     }
   }
 
@@ -297,8 +298,7 @@ Executor::Value Executor::visit_binary(const BinaryExpr &expr) {
     return (op_type == TokenType::EQUAL_COMPARE) ? result : !result;
   }
 
-  throw std::runtime_error("Unknown or unsupported binary operator: " +
-                           expr.op.get_lexeme());
+  throw std::runtime_error("Unknown or unsupported binary operator: " + expr.op.get_lexeme());
 }
 
 Executor::Value Executor::visit_unary(const UnaryExpr &expr) {
@@ -309,281 +309,287 @@ Executor::Value Executor::visit_unary(const UnaryExpr &expr) {
     check_numeric_operand(expr.op, right);
     return -std::get<double>(right);
   }
-
   if (op_type == TokenType::BANG) {
     return !is_truthy(right);
   }
-
-  throw std::runtime_error("Unknown or unsupported unary operator: " +
-                           expr.op.get_lexeme());
+  throw std::runtime_error("Unknown or unsupported unary operator: " + expr.op.get_lexeme());
 }
 
 Executor::Value Executor::visit_grouping(const GroupingExpr &expr) {
   return visit(expr.expression.get());
 }
 
+// --- Implementação de visit_call com built-ins de socket ---
 Executor::Value Executor::visit_call(CallExpr &expr) {
   std::string func_name;
   if (auto var_expr = dynamic_cast<VariableExpr *>(expr.callee.get())) {
     func_name = var_expr->name.get_lexeme();
   } else {
-    throw std::runtime_error(
-        "Calling non-function values or complex callees is not supported");
+    throw std::runtime_error("Calling non-function values or complex callees is not supported");
   }
 
+  // Funções Built-in (incluindo as de socket)
   if (func_name == "print") {
     std::stringstream ss;
     for (size_t i = 0; i < expr.arguments.size(); ++i) {
       Value value = visit(expr.arguments[i].get());
-      if (std::holds_alternative<double>(value)) {
-        ss << std::get<double>(value);
-      } else if (std::holds_alternative<std::string>(value)) {
-        ss << std::get<std::string>(value);
-      } else if (std::holds_alternative<bool>(value)) {
-        ss << (std::get<bool>(value) ? "true" : "false");
-      } else if (is_array(value)) {
+      if (std::holds_alternative<double>(value)) ss << std::get<double>(value);
+      else if (std::holds_alternative<std::string>(value)) ss << std::get<std::string>(value);
+      else if (std::holds_alternative<bool>(value)) ss << (std::get<bool>(value) ? "true" : "false");
+      else if (is_array(value)) {
         const auto &arr = std::get<std::vector<double>>(value);
         ss << "[";
         for (size_t j = 0; j < arr.size(); ++j) {
           ss << arr[j] << (j == arr.size() - 1 ? "" : ", ");
         }
         ss << "]";
-      } else {
-        ss << "<unprintable_value>";
-      }
-      if (i < expr.arguments.size() - 1) {
-        ss << " ";
-      }
+      } else ss << "<unprintable_value>";
+      if (i < expr.arguments.size() - 1) ss << " ";
     }
     std::cout << ss.str() << std::endl;
-    return Value{};
+    return Value{}; // void
   }
-
   if (func_name == "len") {
-    if (expr.arguments.size() != 1) {
-      throw std::runtime_error("len() takes exactly one argument (" +
-                               std::to_string(expr.arguments.size()) +
-                               " given)");
-    }
+    if (expr.arguments.size() != 1) throw std::runtime_error("len() takes exactly one argument.");
     Value arg = visit(expr.arguments[0].get());
-    if (std::holds_alternative<std::string>(arg)) {
-      return Value{static_cast<double>(std::get<std::string>(arg).length())};
-    } else if (is_array(arg)) {
-      const auto &arr = std::get<std::vector<double>>(arg);
-      return Value{static_cast<double>(arr.size())};
-    } else {
-      throw std::runtime_error("len() argument must be a string or an array");
+    if (std::holds_alternative<std::string>(arg)) return static_cast<double>(std::get<std::string>(arg).length());
+    if (is_array(arg)) return static_cast<double>(std::get<std::vector<double>>(arg).size());
+    throw std::runtime_error("len() argument must be a string or an array.");
+  }
+   if (func_name == "sleep") {
+        if (expr.arguments.size() != 1) throw std::runtime_error("sleep() takes exactly one argument (seconds).");
+        Value arg_val = visit(expr.arguments[0].get());
+        if (!std::holds_alternative<double>(arg_val)) throw std::runtime_error("sleep() argument must be a number.");
+        double duration_sec = std::get<double>(arg_val);
+        if (duration_sec < 0) duration_sec = 0;
+        usleep(static_cast<useconds_t>(duration_sec * 1000000.0));
+        return Value{}; // void
     }
+    if (func_name == "input") {
+        if (expr.arguments.size() > 1) throw std::runtime_error("input() takes at most one argument (prompt string).");
+        if (expr.arguments.size() == 1) {
+            Value prompt_val = visit(expr.arguments[0].get());
+            if (std::holds_alternative<std::string>(prompt_val)) std::cout << std::get<std::string>(prompt_val);
+            // else: não imprimir prompt se não for string, ou converter? Para simplicidade, só string.
+        }
+        std::string line_input;
+        if (!std::getline(std::cin, line_input)) {
+             if (std::cin.eof()) return std::string(""); // EOF retorna string vazia
+            throw std::runtime_error("Error reading input.");
+        }
+        return line_input;
+    }
+    if (func_name == "to_number") {
+        if (expr.arguments.size() != 1) throw std::runtime_error("to_number() takes one argument.");
+        Value arg = visit(expr.arguments[0].get());
+        if (std::holds_alternative<std::string>(arg)) {
+            try { return std::stod(std::get<std::string>(arg)); }
+            catch (const std::exception&) { throw std::runtime_error("Cannot convert string '" + std::get<std::string>(arg) + "' to number."); }
+        }
+        if (std::holds_alternative<double>(arg)) return std::get<double>(arg);
+        if (std::holds_alternative<bool>(arg)) return std::get<bool>(arg) ? 1.0 : 0.0;
+        throw std::runtime_error("to_number() argument must be a string, number, or bool.");
+    }
+    if (func_name == "to_string") {
+        if (expr.arguments.size() != 1) throw std::runtime_error("to_string() takes one argument.");
+        Value arg = visit(expr.arguments[0].get());
+        if (std::holds_alternative<double>(arg)) return std::to_string(std::get<double>(arg));
+        if (std::holds_alternative<std::string>(arg)) return std::get<std::string>(arg);
+        if (std::holds_alternative<bool>(arg)) return std::get<bool>(arg) ? "true" : "false";
+        if (is_array(arg)) { /* ... converter array para string ... */ return "[array_representation]"; }
+        return "<unstringifiable_value>";
+    }
+    if (func_name == "to_bool") {
+        if (expr.arguments.size() != 1) throw std::runtime_error("to_bool() takes one argument.");
+        return is_truthy(visit(expr.arguments[0].get()));
+    }
+    if (func_name == "isalpha") {
+        if (expr.arguments.size() != 1) throw std::runtime_error("isalpha() takes one string argument.");
+        Value arg = visit(expr.arguments[0].get());
+        if (!std::holds_alternative<std::string>(arg)) throw std::runtime_error("isalpha() argument must be a string.");
+        std::string s = std::get<std::string>(arg);
+        if (s.length() != 1) return false; // isalpha é para um único caractere
+        return static_cast<bool>(::isalpha(static_cast<unsigned char>(s[0])));
+    }
+    if (func_name == "isnum") {
+        if (expr.arguments.size() != 1) throw std::runtime_error("isnum() takes one string argument.");
+        Value arg = visit(expr.arguments[0].get());
+        if (!std::holds_alternative<std::string>(arg)) throw std::runtime_error("isnum() argument must be a string.");
+        std::string s = std::get<std::string>(arg);
+        if (s.length() != 1) return false; // isnum é para um único caractere
+        return static_cast<bool>(::isdigit(static_cast<unsigned char>(s[0])));
+    }
+    if (func_name == "exp") {
+        if (expr.arguments.size() != 1) throw std::runtime_error("exp() takes one numeric argument.");
+        Value arg = visit(expr.arguments[0].get());
+        check_numeric_operand(expr.paren, arg); // expr.paren como token de referência
+        return std::exp(std::get<double>(arg));
+    }
+    if (func_name == "random") {
+        if (!expr.arguments.empty()) throw std::runtime_error("random() takes no arguments.");
+        return static_cast<double>(rand()) / RAND_MAX;
+    }
+
+  // Novas Funções de Socket
+  if (func_name == "connect_socket") {
+    if (expr.arguments.size() != 2) throw std::runtime_error("connect_socket() requires host (string) and port (number).");
+    Value host_val = visit(expr.arguments[0].get());
+    Value port_val = visit(expr.arguments[1].get());
+    if (!std::holds_alternative<std::string>(host_val)) throw std::runtime_error("connect_socket() host argument must be a string.");
+    if (!std::holds_alternative<double>(port_val)) throw std::runtime_error("connect_socket() port argument must be a number.");
+    std::string host_str = std::get<std::string>(host_val);
+    int port_num = static_cast<int>(std::get<double>(port_val));
+
+    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_fd < 0) return -1.0; // Erro criação
+
+    struct sockaddr_in serv_addr;
+    memset(&serv_addr, 0, sizeof(serv_addr)); // Zera a estrutura
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(port_num);
+
+    if (inet_pton(AF_INET, host_str.c_str(), &serv_addr.sin_addr) <= 0) {
+      close(sock_fd); return -2.0; // Endereço inválido
+    }
+    if (connect(sock_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+      close(sock_fd); return -3.0; 
+    }
+    int handle = next_socket_handle++;
+    active_client_sockets[handle] = sock_fd;
+    return static_cast<double>(handle);
+  }
+  if (func_name == "send_socket") {
+    if (expr.arguments.size() != 2) throw std::runtime_error("send_socket() requires socket_handle (number) and message (string).");
+    Value handle_val = visit(expr.arguments[0].get());
+    Value message_val = visit(expr.arguments[1].get());
+    if (!std::holds_alternative<double>(handle_val)) throw std::runtime_error("send_socket() socket_handle must be a number.");
+    if (!std::holds_alternative<std::string>(message_val)) throw std::runtime_error("send_socket() message must be a string.");
+    int handle = static_cast<int>(std::get<double>(handle_val));
+    std::string message_str = std::get<std::string>(message_val);
+    auto it = active_client_sockets.find(handle);
+    if (it == active_client_sockets.end()) throw std::runtime_error("send_socket(): Invalid socket handle: " + std::to_string(handle));
+    ssize_t bytes_sent = send(it->second, message_str.c_str(), message_str.length(), 0);
+   
+    return bytes_sent >= 0; 
+  }
+  if (func_name == "receive_socket") {
+    if (expr.arguments.size() != 1) throw std::runtime_error("receive_socket() requires socket_handle (number).");
+    Value handle_val = visit(expr.arguments[0].get());
+    if (!std::holds_alternative<double>(handle_val)) throw std::runtime_error("receive_socket() socket_handle must be a number.");
+    int handle = static_cast<int>(std::get<double>(handle_val));
+    auto it = active_client_sockets.find(handle);
+    if (it == active_client_sockets.end()) throw std::runtime_error("receive_socket(): Invalid socket handle: " + std::to_string(handle));
+    
+    char buffer[4096] = {0}; 
+    ssize_t bytes_read = recv(it->second, buffer, sizeof(buffer) - 1, 0);
+    if (bytes_read < 0) return std::string(""); 
+    if (bytes_read == 0) return std::string(""); 
+    return std::string(buffer, bytes_read);
+  }
+  if (func_name == "close_socket") {
+    if (expr.arguments.size() != 1) throw std::runtime_error("close_socket() requires socket_handle (number).");
+    Value handle_val = visit(expr.arguments[0].get());
+    if (!std::holds_alternative<double>(handle_val)) throw std::runtime_error("close_socket() socket_handle must be a number.");
+    int handle = static_cast<int>(std::get<double>(handle_val));
+    auto it = active_client_sockets.find(handle);
+    if (it != active_client_sockets.end()) {
+      close(it->second);
+      active_client_sockets.erase(it);
+    } 
+    return Value{}; 
   }
 
-  if (func_name == "isalpha") {
-    if (expr.arguments.size() != 1)
-      throw std::runtime_error("isalpha requires exactly 1 argument");
-    Value arg = visit(expr.arguments[0].get());
-    if (!std::holds_alternative<std::string>(arg))
-      throw std::runtime_error("Argument of isalpha must be string");
-    std::string s = std::get<std::string>(arg);
-    return Value{s.length() == 1 &&
-                 ::isalpha(static_cast<unsigned char>(s[0]))};
-  }
-  if (func_name == "isnum") {
-    if (expr.arguments.size() != 1)
-      throw std::runtime_error("isnum requires exactly 1 argument");
-    Value arg = visit(expr.arguments[0].get());
-    if (!std::holds_alternative<std::string>(arg))
-      throw std::runtime_error("Argument of isnum must be string");
-    std::string s = std::get<std::string>(arg);
-    return Value{s.length() == 1 &&
-                 ::isdigit(static_cast<unsigned char>(s[0]))};
-  }
-  if (func_name == "to_string") {
-    if (expr.arguments.size() != 1)
-      throw std::runtime_error("to_string requires exactly 1 argument");
-    Value arg = visit(expr.arguments[0].get());
-    if (std::holds_alternative<double>(arg))
-      return std::to_string(std::get<double>(arg));
-    if (std::holds_alternative<bool>(arg))
-      return std::string(std::get<bool>(arg) ? "true" : "false");
-    if (std::holds_alternative<std::string>(arg))
-      return std::get<std::string>(arg);
-    throw std::runtime_error(
-        "to_string argument must be number, bool, or string");
-  }
-  if (func_name == "random") {
-    if (!expr.arguments.empty()) {
-      throw std::runtime_error("random() takes no arguments (" +
-                               std::to_string(expr.arguments.size()) +
-                               " given)");
-    }
-    return static_cast<double>(rand()) / RAND_MAX;
-  }
-  if (func_name == "exp") {
-    if (expr.arguments.size() != 1) {
-      throw std::runtime_error("exp() takes exactly one argument (" +
-                               std::to_string(expr.arguments.size()) +
-                               " given)");
-    }
-    Value arg = visit(expr.arguments[0].get());
-    check_numeric_operand(
-        expr.paren, arg);
-    return std::exp(std::get<double>(arg));
-  }
-  auto it = table_function.find(func_name);
-  if (it == table_function.end()) {
-    if (func_name == "sleep" || func_name == "input" ||
-        func_name == "to_number" || func_name == "to_bool" /* add others */) {
-      throw std::runtime_error(
-          "Built-in function '" + func_name +
-          "' is declared but not implemented in Executor::visit_call");
-    }
+  // Chamada a Funções Definidas pelo Usuário
+  auto it_user_func = table_function.find(func_name);
+  if (it_user_func == table_function.end()) {
     throw std::runtime_error("Undefined function '" + func_name + "'");
   }
-  FunctionStmt *function = it->second;
-
-  size_t expected_args =
-      function->params.param_names ? function->params.param_names->size() : 0;
+  FunctionStmt *function = it_user_func->second;
+  size_t expected_args = function->params.param_names ? function->params.param_names->size() : 0;
   if (expr.arguments.size() != expected_args) {
-    throw std::runtime_error("Wrong number of arguments for function '" +
-                             func_name + "'. Expected " +
-                             std::to_string(expected_args) + ", got " +
-                             std::to_string(expr.arguments.size()));
+    throw std::runtime_error("Wrong number of arguments for function '" + func_name + "'. Expected " +
+                             std::to_string(expected_args) + ", got " + std::to_string(expr.arguments.size()));
   }
-
   FunctionContext context;
-
   if (function->params.param_names) {
-    auto &param_names = *function->params.param_names;
-    for (size_t i = 0; i < param_names.size(); ++i) {
-      Value arg_value = visit(expr.arguments[i].get());
-
-      // if (is_array(arg_value)) {
-      //     // Encontra o array original na memória
-      //     if (auto var_expr =
-      //     dynamic_cast<VariableExpr*>(expr.arguments[i].get())) {
-      //         Value* original_array =
-      //         find_variable(var_expr->name.get_lexeme()); if (original_array
-      //         && is_array(*original_array)) {
-      //             // Armazena uma referência ao array original
-      //             // context.locals[param_names[i].get_lexeme()] =
-      //             *original_array; continue;
-      //         }
-      //     }
-      // }
-
-      context.locals[param_names[i].get_lexeme()] = arg_value;
+    auto &param_names_vec = *function->params.param_names;
+    for (size_t i = 0; i < param_names_vec.size(); ++i) {
+      context.locals[param_names_vec[i].get_lexeme()] = visit(expr.arguments[i].get());
     }
   }
-
   functionStack.push(std::move(context));
-
-  Value return_value;
+  Value return_value = Value{}; // Default para void
+  bool returned_explicitly = false;
   try {
     visit_block(function->body);
+    if (!functionStack.empty() && functionStack.top().hasReturned) {
+      return_value = functionStack.top().returnValue;
+      returned_explicitly = true;
+    }
   } catch (...) {
-    functionStack.pop();
+    if(!functionStack.empty()) functionStack.pop();
     throw;
   }
+  if (!functionStack.empty()) functionStack.pop();
+  else { throw std::runtime_error("Function stack underflow after call to '" + func_name + "'."); }
 
-  FunctionContext &finished_context = functionStack.top();
-  if (finished_context.hasReturned) {
-    return_value = finished_context.returnValue;
-  } else if (function->return_type.get_type() != TokenType::TYPE_NONE) {
-    functionStack.pop();
-    throw std::runtime_error("Function '" + func_name +
-                             "' did not return a value");
+  if (!returned_explicitly && function->return_type.get_type() != TokenType::TYPE_NONE) {
+    throw std::runtime_error("Function '" + func_name + "' did not return a value but was expected to.");
   }
-
-  functionStack.pop();
   return return_value;
 }
 
+
 void Executor::visit(Stmt *stmt) {
-  if (!stmt) {
-    return;
-  }
+  if (!stmt) return;
 
   if (!functionStack.empty() && functionStack.top().hasReturned) {
-    return;
-  }
-  if (!flowStack.empty()) {
-    if (flowStack.top().shouldBreak || flowStack.top().shouldContinue) {
+
       return;
-    }
   }
 
   switch (stmt->get_type()) {
-  case StmtType::DECLARATION:
-    visit_declaration(stmt->get_decl_stmt());
-    break;
-  case StmtType::ASSIGNMENT:
-    visit_assignment(stmt->get_assign_stmt());
-    break;
-  case StmtType::RETURN:
-    visit_return(stmt->get_return_stmt());
-    break;
-  case StmtType::IF:
-    visit_if(stmt->get_if_stmt());
-    break;
-  case StmtType::WHILE:
-    visit_while(stmt->get_while_stmt());
-    break;
-  case StmtType::FOR:
-    visit_for(stmt->get_for_stmt());
-    break;
-  case StmtType::FUNCTION:
-    visit_function(stmt->get_function_stmt());
-    break;
-  case StmtType::SEQ:
-    visit_seq(stmt->get_seq_stmt());
-    break;
-  case StmtType::PAR:
-    visit_par(stmt->get_par_stmt());
-    break;
-  case StmtType::CCHANNEL:
-    visit_cchannel(stmt->get_c_channel_stmt());
-    break;
-  case StmtType::BLOCK:
-    visit_block(stmt->get_block_stmt());
-    break;
-  case StmtType::EXPRESSION:
-    visit_expression(stmt->get_expression_stmt());
-    break;
-  case StmtType::BREAK:
-    visit_break(stmt->get_break_stmt());
-    break;
-  case StmtType::CONTINUE:
-    visit_continue(stmt->get_continue_stmt());
-    break;
+  case StmtType::DECLARATION:    visit_declaration(stmt->get_decl_stmt()); break;
+  case StmtType::ASSIGNMENT:     visit_assignment(stmt->get_assign_stmt()); break;
+  case StmtType::RETURN:         visit_return(stmt->get_return_stmt()); break;
+  case StmtType::IF:             visit_if(stmt->get_if_stmt()); break;
+  case StmtType::WHILE:          visit_while(stmt->get_while_stmt()); break;
+  case StmtType::FOR:            visit_for(stmt->get_for_stmt()); break;
+  case StmtType::FUNCTION:       visit_function(stmt->get_function_stmt()); break;
+  case StmtType::SEQ:            visit_seq(stmt->get_seq_stmt()); break;
+  case StmtType::PAR:            visit_par(stmt->get_par_stmt()); break;
+  case StmtType::CCHANNEL:       visit_cchannel(stmt->get_c_channel_stmt()); break;
+  case StmtType::BLOCK:          visit_block(stmt->get_block_stmt()); break;
+  case StmtType::EXPRESSION:     visit_expression(stmt->get_expression_stmt()); break;
+  case StmtType::BREAK:          visit_break(stmt->get_break_stmt()); break;
+  case StmtType::CONTINUE:       visit_continue(stmt->get_continue_stmt()); break;
   default:
-    throw std::runtime_error(
-        "Unknown or unsupported statement type encountered during execution");
+    throw std::runtime_error("Unknown or unsupported statement type encountered during execution");
   }
 }
 
 void Executor::visit_expression(const ExpressionStmt &stmt) {
   if (stmt.expression) {
-    visit(stmt.expression.get());
+    visit(stmt.expression.get()); 
   }
 }
 
 void Executor::visit_block(const BlockStmt &stmt) {
-  push_scope();
+  push_scope(); 
   try {
     for (const auto &stmt_ptr : stmt.statements) {
       if (stmt_ptr) {
         visit(stmt_ptr.get());
-        if (!functionStack.empty() && functionStack.top().hasReturned)
-          break;
-        if (!flowStack.empty() &&
-            (flowStack.top().shouldBreak || flowStack.top().shouldContinue))
-          break;
+        
+        if (!functionStack.empty() && functionStack.top().hasReturned) break;
+        if (!flowStack.empty() && (flowStack.top().shouldBreak || flowStack.top().shouldContinue)) break;
       }
     }
   } catch (...) {
     pop_scope();
     throw;
   }
-  pop_scope();
+  pop_scope(); 
 }
 
 void Executor::visit_declaration(const DeclarationStmt &stmt) {
@@ -591,77 +597,40 @@ void Executor::visit_declaration(const DeclarationStmt &stmt) {
   if (stmt.initializer) {
     initial_value = visit(stmt.initializer.get());
   } else {
-    throw std::runtime_error(
-        "Variable declaration without initializer is not supported: '" +
-        stmt.identifier.get_lexeme() + "'");
+    // Analisador semântico deve garantir que inicializadores existam se a linguagem os requer.
+    throw std::runtime_error("Variable declaration without initializer: '" + stmt.identifier.get_lexeme() + "'.");
   }
   declare_variable(stmt.identifier.get_lexeme(), initial_value);
 }
 
 void Executor::visit_assignment(const AssignmentStmt &stmt) {
   Value rvalue = visit(stmt.value.get());
-
   if (stmt.target->get_type() == ExprType::VARIABLE) {
-    const VariableExpr *var_expr =
-        static_cast<const VariableExpr *>(stmt.target.get());
+    const VariableExpr *var_expr = static_cast<const VariableExpr *>(stmt.target.get());
     Value *var_ptr = find_variable(var_expr->name.get_lexeme());
-    if (!var_ptr) {
-      throw std::runtime_error("Cannot assign to undefined variable '" +
-                               var_expr->name.get_lexeme() + "'");
-    }
+    if (!var_ptr) throw std::runtime_error("Cannot assign to undefined variable '" + var_expr->name.get_lexeme() + "'.");
     *var_ptr = rvalue;
-
   } else if (stmt.target->get_type() == ExprType::INDEX) {
-    const IndexExpr *index_expr =
-        static_cast<const IndexExpr *>(stmt.target.get());
-
+    const IndexExpr *index_expr = static_cast<const IndexExpr *>(stmt.target.get());
     Value index_val = visit(index_expr->index_expr.get());
-    if (!std::holds_alternative<double>(index_val)) {
-      throw std::runtime_error("Array index must evaluate to a number.");
-    }
+    if (!std::holds_alternative<double>(index_val)) throw std::runtime_error("Array index must be a number.");
     double idx_double = std::get<double>(index_val);
-    if (idx_double < 0 || idx_double != floor(idx_double)) {
-      throw std::runtime_error("Array index must be a non-negative integer.");
-    }
-    size_t index = static_cast<size_t>(idx_double);
+    if (idx_double < 0 || idx_double != floor(idx_double)) throw std::runtime_error("Array index must be a non-negative integer.");
+    size_t valid_idx = static_cast<size_t>(idx_double);
 
+    // O objeto do IndexExpr (o array em si) deve ser um L-Value (uma variável que contém o array)
     if (index_expr->object->get_type() == ExprType::VARIABLE) {
-      const VariableExpr *array_var_expr =
-          static_cast<const VariableExpr *>(index_expr->object.get());
-      Value *var_containing_array_ptr =
-          find_variable(array_var_expr->name.get_lexeme());
-
-      if (!var_containing_array_ptr) {
-        throw std::runtime_error(
-            "Cannot assign to element of undefined array variable '" +
-            array_var_expr->name.get_lexeme() + "'.");
-      }
-      if (!is_array(*var_containing_array_ptr)) {
-        throw std::runtime_error(
-            "Cannot assign to indexed element because variable '" +
-            array_var_expr->name.get_lexeme() + "' is not an array.");
-      }
-
-      std::vector<double> &actual_array =
-          std::get<std::vector<double>>(*var_containing_array_ptr);
-
-      if (index >= actual_array.size()) {
-        throw std::runtime_error(
-            "Array index " + std::to_string(index) +
-            " out of bounds for array '" + array_var_expr->name.get_lexeme() +
-            "' (size " + std::to_string(actual_array.size()) + ").");
-      }
-
-      if (!std::holds_alternative<double>(rvalue)) {
-        throw std::runtime_error(
-            "Cannot assign non-number value to an element of array_number.");
-      }
-
-      actual_array[index] = std::get<double>(rvalue);
+      const VariableExpr *array_var_expr = static_cast<const VariableExpr *>(index_expr->object.get());
+      Value *var_containing_array_ptr = find_variable(array_var_expr->name.get_lexeme());
+      if (!var_containing_array_ptr) throw std::runtime_error("Array variable '" + array_var_expr->name.get_lexeme() + "' not found for assignment.");
+      if (!is_array(*var_containing_array_ptr)) throw std::runtime_error("Variable '" + array_var_expr->name.get_lexeme() + "' is not an array.");
+      
+      std::vector<double> &actual_array = std::get<std::vector<double>>(*var_containing_array_ptr);
+      if (valid_idx >= actual_array.size()) throw std::runtime_error("Array index " + std::to_string(valid_idx) + " out of bounds for array '" + array_var_expr->name.get_lexeme() + "'.");
+      if (!std::holds_alternative<double>(rvalue)) throw std::runtime_error("Cannot assign non-number to array_number element.");
+      actual_array[valid_idx] = std::get<double>(rvalue);
     } else {
-      throw std::runtime_error(
-          "Assignment target must be a variable or an array element accessed "
-          "via variable (e.g., var[index] = value).");
+      throw std::runtime_error("Assignment to indexed element requires the array to be a variable.");
     }
   } else {
     throw std::runtime_error("Invalid target for assignment.");
@@ -669,17 +638,11 @@ void Executor::visit_assignment(const AssignmentStmt &stmt) {
 }
 
 void Executor::visit_return(const ReturnStmt &stmt) {
-  if (functionStack.empty()) {
-    throw std::runtime_error("'return' statement outside of a function");
-  }
-
+  if (functionStack.empty()) throw std::runtime_error("'return' statement outside of a function.");
   FunctionContext &context = functionStack.top();
   context.hasReturned = true;
-  if (stmt.value) {
-    context.returnValue = visit(stmt.value.get());
-  } else {
-    context.returnValue = Value{};
-  }
+  if (stmt.value) context.returnValue = visit(stmt.value.get());
+  else context.returnValue = Value{}; // void
 }
 
 void Executor::visit_if(const IfStmt &stmt) {
@@ -692,359 +655,242 @@ void Executor::visit_if(const IfStmt &stmt) {
 }
 
 void Executor::visit_while(const WhileStmt &stmt) {
-  flowStack.push({false, false, false, Value{}});
-
+  flowStack.push({false, false, false, Value{}}); // Entra no loop
   try {
     while (is_truthy(visit(stmt.condition.get()))) {
       visit_block(stmt.body);
-
-      if (!flowStack.empty()) {
-        FlowControl &current_flow = flowStack.top();
-        if (current_flow.shouldBreak) {
-          break;
-        }
-        if (current_flow.shouldContinue) {
-          current_flow.shouldContinue = false;
-          continue;
-        }
-        if (current_flow.shouldReturn) {
-          break;
-        }
-      }
+      FlowControl &current_loop_flow = flowStack.top();
+      if (current_loop_flow.shouldBreak) break; // Sai do while
+      if (current_loop_flow.shouldContinue) current_loop_flow.shouldContinue = false; // Reseta para próxima iteração
+      if (current_loop_flow.shouldReturn || (!functionStack.empty() && functionStack.top().hasReturned)) break; // Propaga return
     }
   } catch (...) {
-    if (!flowStack.empty())
-      flowStack.pop();
-    throw;
+    if (!flowStack.empty()) flowStack.pop(); throw;
   }
-
-  if (!flowStack.empty())
-    flowStack.pop();
+  if (!flowStack.empty()) flowStack.pop(); // Sai do loop
 }
 
 void Executor::visit_for(const ForStmt &stmt) {
-  push_scope();
+  push_scope(); // Escopo para inicializador e loop
   flowStack.push({false, false, false, Value{}});
-
   try {
-    if (stmt.initializer) {
-      visit(stmt.initializer.get());
-    }
-
-    while (true) {
-      if (stmt.condition) {
-        if (!is_truthy(visit(stmt.condition.get()))) {
-          break;
-        }
-      }
-
+    if (stmt.initializer) visit(stmt.initializer.get());
+    while (stmt.condition ? is_truthy(visit(stmt.condition.get())) : true) { // Condição vazia é true
       visit_block(stmt.body);
-
-      if (!flowStack.empty()) {
-        FlowControl &current_flow = flowStack.top();
-        if (current_flow.shouldBreak) {
-          break;
-        }
-        if (current_flow.shouldContinue) {
-          current_flow.shouldContinue = false;
-        }
-        if (current_flow.shouldReturn) {
-          break;
-        }
-      }
-
-      if (stmt.increment) {
-        visit(stmt.increment.get());
-      }
+      FlowControl &current_loop_flow = flowStack.top();
+      if (current_loop_flow.shouldBreak) break;
+      if (current_loop_flow.shouldContinue) current_loop_flow.shouldContinue = false;
+      if (current_loop_flow.shouldReturn || (!functionStack.empty() && functionStack.top().hasReturned)) break;
+      if (stmt.increment) visit(stmt.increment.get());
     }
-
   } catch (...) {
-    if (!flowStack.empty())
-      flowStack.pop();
-    pop_scope();
-    throw;
+    if (!flowStack.empty()) flowStack.pop(); pop_scope(); throw;
   }
-
-  if (!flowStack.empty())
-    flowStack.pop();
+  if (!flowStack.empty()) flowStack.pop();
   pop_scope();
 }
 
-void Executor::visit_break(const BreakStmt & /*brk*/) {
-  if (flowStack.empty()) {
-    throw std::runtime_error("'break' statement outside of a loop");
-  }
+void Executor::visit_break(const BreakStmt &) {
+  if (flowStack.empty()) throw std::runtime_error("'break' statement outside of a loop.");
   flowStack.top().shouldBreak = true;
 }
 
-void Executor::visit_continue(const ContinueStmt & /*cont*/) {
-  if (flowStack.empty()) {
-    throw std::runtime_error("'continue' statement outside of a loop");
-  }
+void Executor::visit_continue(const ContinueStmt &) {
+  if (flowStack.empty()) throw std::runtime_error("'continue' statement outside of a loop.");
   flowStack.top().shouldContinue = true;
 }
 
-void Executor::visit_function(const FunctionStmt & /*stmt*/) {
-  // No runtime action needed for function definition itself
+void Executor::visit_function(const FunctionStmt &) {
+  // Definição de função: nenhuma ação em tempo de execução aqui, já foi registrada.
 }
 
-void Executor::visit_seq(const SeqStmt &stmt) { visit_block(stmt.body); }
+void Executor::visit_seq(const SeqStmt &stmt) {
+  // Bloco SEQ é tratado como um bloco normal na execução
+  visit_block(stmt.body);
+}
 
 void Executor::visit_par(const ParStmt &stmt) {
   std::vector<std::future<void>> futures;
-  std::mutex mtx;
-  std::atomic<bool> error_flag(false);
-  std::string error_message;
+  std::mutex error_reporting_mutex_local; 
+  std::atomic<bool> error_flag_local(false);
+  std::string error_message_str_local; 
 
-  for (const auto &stmt_ptr : stmt.body.statements) {
-    if (!stmt_ptr)
-      continue;
-
-    futures.emplace_back(std::async(std::launch::async, [&, stmt_ptr]() {
+  for (const auto &stmt_ptr_par : stmt.body.statements) {
+    if (!stmt_ptr_par) continue;
+    futures.emplace_back(std::async(std::launch::async, [this, stmt_ptr_par, &error_reporting_mutex_local, &error_flag_local, &error_message_str_local]() {
+      std::lock_guard<std::mutex> guard(this->execution_mutex); 
       try {
-        visit(stmt_ptr.get());
+        this->visit(stmt_ptr_par.get());
       } catch (const std::runtime_error &e) {
-        std::lock_guard<std::mutex> lock(mtx);
-        if (!error_flag.load()) {
-          error_message = e.what();
-          error_flag = true;
+        std::lock_guard<std::mutex> lock(error_reporting_mutex_local); 
+        if (!error_flag_local.load()) {
+          error_message_str_local = e.what();
+          error_flag_local = true;
         }
       } catch (...) {
-        std::lock_guard<std::mutex> lock(mtx);
-        if (!error_flag.load()) {
-          error_message = "Unknown error occurred in parallel block.";
-          error_flag = true;
+        std::lock_guard<std::mutex> lock(error_reporting_mutex_local); 
+        if (!error_flag_local.load()) {
+          error_message_str_local = "Unknown error occurred in parallel block.";
+          error_flag_local = true;
         }
       }
     }));
   }
-
   for (auto &fut : futures) {
     try {
-      fut.get();
-    } catch (const std::runtime_error &e) {
-      std::lock_guard<std::mutex> lock(mtx);
-      if (!error_flag.load()) {
-        error_message = e.what();
-        error_flag = true;
-      }
+      fut.get(); 
+    } catch (const std::runtime_error &e) { // Exceções do std::async podem ser relançadas por fut.get()
+      std::lock_guard<std::mutex> lock(error_reporting_mutex_local);
+      if (!error_flag_local.load()) { error_message_str_local = e.what(); error_flag_local = true; }
     } catch (...) {
-      std::lock_guard<std::mutex> lock(mtx);
-      if (!error_flag.load()) {
-        error_message = "Unknown error occurred waiting for parallel task.";
-        error_flag = true;
-      }
+      std::lock_guard<std::mutex> lock(error_reporting_mutex_local);
+      if (!error_flag_local.load()) { error_message_str_local = "Unknown error during future.get()."; error_flag_local = true; }
     }
   }
-
-  if (error_flag.load()) {
-    throw std::runtime_error("Error during PAR execution: " + error_message);
+  if (error_flag_local.load()) {
+    throw std::runtime_error("Error during PAR execution: " + error_message_str_local);
   }
 }
 
 void Executor::visit_cchannel(const CChannelStmt &stmt) {
   auto func_it = table_function.find(stmt.channel_name.get_lexeme());
   if (func_it == table_function.end()) {
-    throw std::runtime_error("Handler function '" +
-                             stmt.channel_name.get_lexeme() +
-                             "' for c_channel not found.");
+    throw std::runtime_error("Handler function '" + stmt.channel_name.get_lexeme() + "' for c_channel not found.");
   }
-  FunctionStmt *handler_function = func_it->second;
+  FunctionStmt *handler_function_ptr = func_it->second; // Ponteiro para o nó da função
 
   Value *desc_val_ptr = find_variable(stmt.id_1.get_lexeme());
   Value *host_val_ptr = find_variable(stmt.id_2.get_lexeme());
-
-  if (!desc_val_ptr || !host_val_ptr) {
-    throw std::runtime_error("Variable(s) '" + stmt.id_1.get_lexeme() +
-                             "' or '" + stmt.id_2.get_lexeme() +
-                             "' not found for c_channel.");
+  if (!desc_val_ptr || !host_val_ptr) throw std::runtime_error("Variable(s) for c_channel description or host not found.");
+  if (!std::holds_alternative<std::string>(*desc_val_ptr) || !std::holds_alternative<std::string>(*host_val_ptr)) {
+    throw std::runtime_error("c_channel parameters (description, host) must be strings.");
   }
-  if (!std::holds_alternative<std::string>(*desc_val_ptr) ||
-      !std::holds_alternative<std::string>(*host_val_ptr)) {
-    throw std::runtime_error(
-        "c_channel parameters (description, host) must be strings.");
-  }
-
-  std::string description = std::get<std::string>(*desc_val_ptr);
-  std::string host_address = std::get<std::string>(*host_val_ptr);
-  int port = 8585;
+  std::string description_str = std::get<std::string>(*desc_val_ptr);
+  std::string host_address_str = std::get<std::string>(*host_val_ptr);
+  int port_num_cchannel = 8585; // Porta fixa para c_channel
 
   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (server_fd == -1) {
-    perror("socket failed");
-    throw std::runtime_error("Failed to create channel socket.");
+  if (server_fd == -1) throw std::runtime_error("Failed to create c_channel server socket.");
+  int opt_reuse = 1;
+  if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt_reuse, sizeof(opt_reuse)) == -1) {
+    close(server_fd); throw std::runtime_error("Failed to set c_channel socket options (SO_REUSEADDR).");
   }
-
-  int opt = 1;
-  if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) ==
-      -1) {
-    perror("setsockopt(SO_REUSEADDR) failed");
-    close(server_fd);
-    throw std::runtime_error("Failed to set channel socket options.");
+  struct sockaddr_in server_address_cchannel;
+  memset(&server_address_cchannel, 0, sizeof(server_address_cchannel));
+  server_address_cchannel.sin_family = AF_INET;
+  server_address_cchannel.sin_port = htons(port_num_cchannel);
+  if (inet_pton(AF_INET, host_address_str.c_str(), &server_address_cchannel.sin_addr) <= 0) {
+    close(server_fd); throw std::runtime_error("Invalid c_channel host address: " + host_address_str);
   }
-
-  struct sockaddr_in address;
-  memset(&address, 0, sizeof(address));
-  address.sin_family = AF_INET;
-  address.sin_port = htons(port);
-
-  if (inet_pton(AF_INET, host_address.c_str(), &address.sin_addr) <= 0) {
-    perror("inet_pton failed");
-    close(server_fd);
-    throw std::runtime_error(
-        "Invalid channel address or address not supported: " + host_address);
+  if (bind(server_fd, (struct sockaddr *)&server_address_cchannel, sizeof(server_address_cchannel)) == -1) {
+    close(server_fd); throw std::runtime_error("Failed to bind c_channel socket to " + host_address_str + ":" + std::to_string(port_num_cchannel));
   }
-
-  if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) == -1) {
-    perror("bind failed");
-    close(server_fd);
-    throw std::runtime_error("Failed to bind channel socket to " +
-                             host_address + ":" + std::to_string(port));
+  if (listen(server_fd, 10) == -1) { // Backlog aumentado para 10
+    close(server_fd); throw std::runtime_error("Failed to listen on c_channel socket.");
   }
+  std::cout << "c_channel server '" << stmt.channel_name.get_lexeme() << "' (handler: " << handler_function_ptr->name.get_lexeme() 
+            << ") running on " << host_address_str << ":" << port_num_cchannel << std::endl;
+  std::cout << "Description: " << description_str << std::endl;
 
-  if (listen(server_fd, 5) == -1) {
-    perror("listen failed");
-    close(server_fd);
-    throw std::runtime_error("Failed to listen on channel socket.");
-  }
-
-  std::cout << "Channel server '" << stmt.channel_name.get_lexeme()
-            << "' running on " << host_address << ":" << port << std::endl;
-  std::cout << "Description: " << description << std::endl;
-
-  std::thread([this, server_fd, handler_function,
-               func_name = stmt.channel_name.get_lexeme()]() {
+  // Thread do servidor de c_channel (desanexada)
+  // ATENÇÃO: Capturar 'this' em uma thread desanexada é perigoso se o Executor for destruído.
+  // Para um servidor de longa duração, o Executor precisa viver tanto quanto esta thread.
+  std::thread([this, server_fd, handler_function_node = *handler_function_ptr /* Copia o nó da função */, func_name_str = handler_function_ptr->name.get_lexeme()]() {
     while (true) {
-      struct sockaddr_in client_address;
-      socklen_t client_len = sizeof(client_address);
-      int client_socket =
-          accept(server_fd, (struct sockaddr *)&client_address, &client_len);
-
-      if (client_socket == -1) {
-        perror("accept failed");
-        continue;
+      struct sockaddr_in client_addr_cchannel;
+      socklen_t client_len_cchannel = sizeof(client_addr_cchannel);
+      int client_sock_fd = accept(server_fd, (struct sockaddr *)&client_addr_cchannel, &client_len_cchannel);
+      if (client_sock_fd == -1) {
+         // perror("c_channel accept failed"); // Para debug
+         // Se server_fd foi fechado (ex: no destrutor do Executor), accept falhará.
+         // Seria bom ter uma forma de sinalizar o fim do servidor.
+         break; // Sai do loop se accept falhar (ex: socket fechado)
       }
-
-      std::thread(
-          [this, client_socket, handler_function, func_name](int sock) {
-            char buffer[1024] = {0};
-            ssize_t bytes_read = read(sock, buffer, sizeof(buffer) - 1);
-
-            if (bytes_read > 0) {
-              std::string message(buffer, bytes_read);
-
-              try {
-                if (!handler_function->params.param_names ||
-                    handler_function->params.param_names->size() != 1) {
-                  throw std::runtime_error(
-                      "Channel handler function '" + func_name +
-                      "' must accept exactly one argument.");
-                }
-
-                std::vector<std::unique_ptr<Expr>> args;
-                args.push_back(std::make_unique<LiteralExpr>(
-                    Token(TokenType::STRING_LITERAL, message, 0, 0, message)));
-
-                Token dummy_paren(TokenType::LEFT_PAREN, "(", 0, 0);
-                CallExpr call_node(
-                    std::make_unique<VariableExpr>(handler_function->name),
-                    dummy_paren, std::move(args));
-
-                Value result = visit_call(call_node);
-
-                std::string response;
-                if (std::holds_alternative<double>(result)) {
-                  response = std::to_string(std::get<double>(result));
-                } else if (std::holds_alternative<std::string>(result)) {
-                  response = std::get<std::string>(result);
-                } else if (std::holds_alternative<bool>(result)) {
-                  response = std::get<bool>(result) ? "true" : "false";
-                } else {
-                  response = "<void_or_unsupported_return_type>";
-                }
-
-                send(sock, response.c_str(), response.length(), 0);
-
-              } catch (const std::runtime_error &e) {
-                std::cerr << "Error executing channel handler '" << func_name
-                          << "': " << e.what() << std::endl;
-                std::string error_response = "RUNTIME_ERROR: ";
-                error_response += e.what();
-                send(sock, error_response.c_str(), error_response.length(), 0);
-              }
-            } else if (bytes_read == 0) {
-              // Connection closed
-            } else {
-              perror("read from client failed");
+      // Thread para cada cliente de c_channel (desanexada)
+      std::thread([this, client_sock_fd, captured_handler_node = handler_function_node, captured_func_name = func_name_str](int sock) {
+        char buffer_cchannel[1024] = {0};
+        ssize_t bytes_read_cchannel = recv(sock, buffer_cchannel, sizeof(buffer_cchannel) - 1, 0);
+        if (bytes_read_cchannel > 0) {
+          std::string message_from_client(buffer_cchannel, bytes_read_cchannel);
+          Value result_from_handler;
+          try {
+            std::lock_guard<std::mutex> exec_guard(this->execution_mutex); // Protege chamada ao handler
+            if (!captured_handler_node.params.param_names || captured_handler_node.params.param_names->size() != 1) {
+              throw std::runtime_error("c_channel handler '" + captured_func_name + "' must accept exactly one string argument.");
             }
-            close(sock);
-          },
-          client_socket)
-          .detach();
+            // Assumindo que o parâmetro do handler é string (semântica deveria verificar)
+            
+            std::vector<std::unique_ptr<Expr>> args_for_handler;
+            args_for_handler.push_back(std::make_unique<LiteralExpr>(Token(TokenType::STRING_LITERAL, message_from_client, 0,0, message_from_client)));
+            
+            Token dummy_paren_cchannel(TokenType::LEFT_PAREN, "(", 0,0);
+            auto callee_expr_cchannel = std::make_unique<VariableExpr>(captured_handler_node.name); // Usa o token nome da função copiada
+            CallExpr call_node_cchannel(std::move(callee_expr_cchannel), dummy_paren_cchannel, std::move(args_for_handler));
+            
+            result_from_handler = this->visit_call(call_node_cchannel);
+
+          } catch (const std::runtime_error &e) {
+            std::cerr << "Error in c_channel handler '" << captured_func_name << "': " << e.what() << std::endl;
+            std::string err_resp = "HANDLER_ERROR: " + std::string(e.what());
+            send(sock, err_resp.c_str(), err_resp.length(), 0);
+            close(sock); return;
+          }
+          std::string response_to_client;
+          if (std::holds_alternative<double>(result_from_handler)) response_to_client = std::to_string(std::get<double>(result_from_handler));
+          else if (std::holds_alternative<std::string>(result_from_handler)) response_to_client = std::get<std::string>(result_from_handler);
+          else if (std::holds_alternative<bool>(result_from_handler)) response_to_client = (std::get<bool>(result_from_handler) ? "true" : "false");
+          else response_to_client = "<handler_returned_void_or_unsupported_type>";
+          send(sock, response_to_client.c_str(), response_to_client.length(), 0);
+        }
+        // else if (bytes_read_cchannel == 0) { /* Peer fechou conexão */ }
+        // else { /* perror("c_channel recv failed"); */ }
+        close(sock);
+      }, client_sock_fd).detach();
     }
+    // Se o loop quebrar, fechar o socket do servidor principal de c_channel
+    // close(server_fd); // CUIDADO: Se o Executor for destruído, o destrutor já tentará fechar.
+    //                // Este close aqui só se o loop for quebrado por outra razão que não a destruição do Executor.
   }).detach();
 }
 
+
+// --- Funções Helper (is_truthy, is_equal, etc.) ---
 bool Executor::is_truthy(const Value &value) {
-  if (std::holds_alternative<bool>(value)) {
-    return std::get<bool>(value);
-  }
-  if (std::holds_alternative<double>(value)) {
-    return std::get<double>(value) != 0.0;
-  }
-  if (std::holds_alternative<std::string>(value)) {
-    return !std::get<std::string>(value).empty();
-  }
-  if (is_array(value)) {
-    return !std::get<std::vector<double>>(value).empty();
-  }
-  return false;
+  if (std::holds_alternative<bool>(value)) return std::get<bool>(value);
+  if (std::holds_alternative<double>(value)) return std::get<double>(value) != 0.0;
+  if (std::holds_alternative<std::string>(value)) return !std::get<std::string>(value).empty();
+  if (is_array(value)) return !std::get<std::vector<double>>(value).empty();
+  return false; // Valor default (void) é falso
 }
 
 bool Executor::is_equal(const Value &a, const Value &b) {
-  if (std::holds_alternative<double>(a) && std::holds_alternative<double>(b)) {
-    double val_a = std::get<double>(a);
-    double val_b = std::get<double>(b);
-    const double epsilon = 1e-9;
-    return std::abs(val_a - val_b) < epsilon;
-  }
-  if (std::holds_alternative<std::string>(a) &&
-      std::holds_alternative<std::string>(b)) {
-    return std::get<std::string>(a) == std::get<std::string>(b);
-  }
-  if (std::holds_alternative<bool>(a) && std::holds_alternative<bool>(b)) {
-    return std::get<bool>(a) == std::get<bool>(b);
-  }
-  if (is_array(a) && is_array(b)) {
+  if (a.index() != b.index()) return false; // Tipos diferentes no variant não são iguais
+  if (std::holds_alternative<double>(a)) return std::abs(std::get<double>(a) - std::get<double>(b)) < 1e-9;
+  if (std::holds_alternative<std::string>(a)) return std::get<std::string>(a) == std::get<std::string>(b);
+  if (std::holds_alternative<bool>(a)) return std::get<bool>(a) == std::get<bool>(b);
+  if (is_array(a)) {
     const auto &arr_a = std::get<std::vector<double>>(a);
     const auto &arr_b = std::get<std::vector<double>>(b);
-    if (arr_a.size() != arr_b.size())
-      return false;
-    const double epsilon = 1e-9;
+    if (arr_a.size() != arr_b.size()) return false;
     for (size_t i = 0; i < arr_a.size(); ++i) {
-      if (std::abs(arr_a[i] - arr_b[i]) >= epsilon) {
-        return false;
-      }
+      if (std::abs(arr_a[i] - arr_b[i]) >= 1e-9) return false;
     }
     return true;
   }
-
-  return false;
+  // Se chegou aqui, pode ser um tipo não tratado ou ambos são o tipo default do variant (se não for um dos acima)
+  // Se Value{} (void) for o único estado restante, e a.index() == b.index(), então são iguais (void == void).
+  return true; // Implica que se os índices são iguais e não é um dos tipos acima, são iguais (ex: void==void)
 }
 
 void Executor::check_numeric_operand(const Token &op, const Value &operand) {
   if (!std::holds_alternative<double>(operand)) {
-    throw std::runtime_error("Operand for operator '" + op.get_lexeme() +
-                             "' must be a number");
+    throw std::runtime_error("Operand for operator '" + op.get_lexeme() + "' must be a number.");
   }
 }
 
-void Executor::check_numeric_operands(const Token &op, const Value &left,
-                                      const Value &right) {
-  if (!std::holds_alternative<double>(left) ||
-      !std::holds_alternative<double>(right)) {
-    throw std::runtime_error("Operands for operator '" + op.get_lexeme() +
-                             "' must both be numbers");
+void Executor::check_numeric_operands(const Token &op, const Value &left, const Value &right) {
+  if (!std::holds_alternative<double>(left) || !std::holds_alternative<double>(right)) {
+    throw std::runtime_error("Operands for operator '" + op.get_lexeme() + "' must both be numbers.");
   }
 }
 

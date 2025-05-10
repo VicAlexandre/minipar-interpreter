@@ -1,6 +1,5 @@
-func fatorial(x: number, y: number) -> void
-{
-  func fat(n: number) -> number{
+
+func fat(n: number) -> number{
     prod: number = 1
     i: number = 2
     while(i <= n){
@@ -9,6 +8,8 @@ func fatorial(x: number, y: number) -> void
     }
     return prod
   }
+func fatorial(x: number, y: number) -> void
+{
 
   i: number = x
   while(i <= y)
@@ -35,6 +36,9 @@ func fibonacci(n: number) -> void{
   }
 }
 
+par {
+  fatorial(2, 5)
+  fibonacci(10)
+}
 
-fatorial(2, 5)
-fibonacci(10)
+

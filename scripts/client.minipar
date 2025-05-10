@@ -1,0 +1,85 @@
+# Funções de cliente de rede hipotéticas (PRECISAM SER IMPLEMENTADAS NO INTERPRETADOR C++)
+# func connect_socket(host: string, port: number) -> number { /* ... C++ ... */ return 0 }
+# func send_socket(socket_handle: number, message: string) -> bool { /* ... C++ ... */ return true }
+# func receive_socket(socket_handle: number) -> string { /* ... C++ ... */ return "" }
+# func close_socket(socket_handle: number) -> void { /* ... C++ ... */ }
+
+func enviar_operacao(host: string, port: number, operacao: string) -> string {
+  socket_id: number = connect_socket(host, port)
+
+  if (socket_id < 0) { # Supondo que um valor negativo indica erro na conexão
+    print("Erro ao conectar ao servidor:", host, "na porta", port)
+    return "ERRO_CONEXAO"
+  }
+  print("Conectado ao servidor. Enviando:", operacao)
+
+  sucesso_envio: bool = send_socket(socket_id, operacao)
+  if (!sucesso_envio) {
+    print("Erro ao enviar dados para o servidor.")
+    close_socket(socket_id)
+    return "ERRO_ENVIO"
+  }
+
+  print("Dados enviados. Aguardando resposta...")
+  resposta: string = receive_socket(socket_id) # Supondo que esta função bloqueia até receber dados
+
+  if (len(resposta) == 0 && !sucesso_envio) { # Adapte a condição de erro de receive
+      print("Nenhuma resposta recebida ou erro na recepção.")
+      close_socket(socket_id)
+      return "ERRO_RECEPCAO"
+  }
+
+  print("Resposta recebida:", resposta)
+  close_socket(socket_id)
+  print("Conexão fechada.")
+  return resposta
+}
+
+# --- Início do Script Cliente ---
+
+servidor_host: string = "127.0.0.1"
+servidor_porta: number = 8585 # Porta padrão do seu c_channel
+
+print("--- Teste da Calculadora Remota ---")
+
+# Teste 1
+op1: string = "10 + 5"
+print("Enviando operação:", op1)
+resultado1: string = enviar_operacao(servidor_host, servidor_porta, op1)
+print("Resultado de '", op1, "':", resultado1)
+print("------------------------------------")
+sleep(1) # Pausa para não sobrecarregar e facilitar visualização
+
+# Teste 2
+op2: string = "100 - 25 * 2 + 10 / 5" # Será calculado da esquerda para a direita
+print("Enviando operação:", op2)
+resultado2: string = enviar_operacao(servidor_host, servidor_porta, op2)
+print("Resultado de '", op2, "':", resultado2) # Esperado: ( ( (100-25)*2 ) + 10) / 5 pela lógica atual do server
+                                               # Ou seja: ( (75*2) + 10 ) / 5  => (150+10)/5 => 160/5 = 32
+print("------------------------------------")
+sleep(1)
+
+# Teste 3: Operação inválida
+op3: string = "5 ++ 3"
+print("Enviando operação:", op3)
+resultado3: string = enviar_operacao(servidor_host, servidor_porta, op3)
+print("Resultado de '", op3, "':", resultado3)
+print("------------------------------------")
+sleep(1)
+
+# Teste 4: Divisão por zero
+op4: string = "10 / 0"
+print("Enviando operação:", op4)
+resultado4: string = enviar_operacao(servidor_host, servidor_porta, op4)
+print("Resultado de '", op4, "':", resultado4)
+print("------------------------------------")
+sleep(1)
+
+# Teste 5: Caractere inválido
+op5: string = "10 a 5"
+print("Enviando operação:", op5)
+resultado5: string = enviar_operacao(servidor_host, servidor_porta, op5)
+print("Resultado de '", op5, "':", resultado5)
+print("------------------------------------")
+
+print("--- Fim dos Testes ---")

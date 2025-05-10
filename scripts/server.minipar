@@ -3,32 +3,105 @@ func calc(message: string) -> string{
   size: number = len(message)
   result: number = 0
   operator: string = "+"
-  print(message)
+  current_number_str: string = ""
+  has_decimal_point: bool = false # Nova flag para controlar o ponto decimal
+
+  # print("Servidor recebeu:", message) # Debug no servidor
+
   while(index < size)
   {
-    if(isalpha(message[index])){return "INVALIDO"}
-    if(message[index] == " "){
+    char: string = message[index] # Obtém o caractere como string de tamanho 1
+
+    if(isalpha(char)){ return "INVALIDO: Caractere alfabético não permitido" }
+
+    if(char == " "){
       index = index + 1
       continue
     }
-    if(isnum(message[index])){
-      valor: string = message[index]
+
+    # Lógica para construir o número (dígitos e um único ponto decimal)
+    if(isnum(char)){
+      current_number_str = current_number_str + char
       index = index + 1
-      while(index < size && isnum(message[index])){
-        valor = valor + message[index]
+      if (index < size) { continue } # Continua se o próximo caractere puder ser parte do número
+    } else { if (char == "." && !has_decimal_point && len(current_number_str) > 0) { # Ponto decimal após pelo menos um dígito
+        current_number_str = current_number_str + char
+        has_decimal_point = true
         index = index + 1
+        if (index < size) { continue }
+      } else { if (char == "." && !has_decimal_point && len(current_number_str) == 0) { # Ponto decimal no início (ex: .5)
+          current_number_str = "0." # Trata como 0.
+          has_decimal_point = true
+          index = index + 1
+          if (index < size) { continue }
+        }
       }
-      valor_num: number = to_number(valor)
-      if(operator == "+"){result = result + valor_num}
-      else{if(operator == "-"){result = result - valor_num}
-      else{if(operator == "*"){result = result * valor_num}
-      else{if(operator == "/"){result = result / valor_num}
-      else{return "INVALIDO"}}}}
-    }else{
-      operator = message[index]
+    }
+
+
+    # Se um número foi formado (current_number_str não está vazio) E
+    # (estamos no fim da mensagem OU o caractere atual NÃO é um dígito nem um ponto decimal válido para continuar o número)
+    # OU se o caractere atual é um operador (e um número pode ter sido formado antes)
+    if (len(current_number_str) > 0 && (index == size || (!isnum(message[index]) && message[index] != ".") || char == "+" || char == "-" || char == "*" || char == "/")) {
+      valor_num: number = to_number(current_number_str)
+      # print("Processando valor:", valor_num, "com operador:", operator) # Debug
+      if(operator == "+"){ result = result + valor_num }
+      else{ if(operator == "-"){ result = result - valor_num }
+      else{ if(operator == "*"){ result = result * valor_num }
+      else{ if(operator == "/"){
+              if (valor_num == 0) { return "INVALIDO: Divisão por zero" }
+              result = result / valor_num
+            }
+      else{ return "INVALIDO: Operador desconhecido '" + operator + "'" }}}}
+      current_number_str = "" # Reseta para o próximo número
+      has_decimal_point = false # Reseta a flag do ponto decimal
+    }
+
+    # Se não é o fim da string e o caractere atual não foi usado para número, deve ser um operador
+    if (index < size) {
+      char_op_check: string = message[index] # Re-ler o caractere atual se não foi consumido pelo número
+      if (char_op_check == "+" || char_op_check == "-" || char_op_check == "*" || char_op_check == "/") {
+        # Só atualiza o operador se não acabamos de processar um número
+        # e se não há um número sendo construído (current_number_str está vazio)
+        if (len(current_number_str) == 0) {
+             operator = char_op_check
+             # print("Novo operador:", operator) # Debug
+        } else {
+            # Erro: operador aparecendo logo após dígitos sem espaço, ou dois operadores seguidos
+            # A lógica anterior de processamento de número já deve ter tratado o número.
+            # Se current_number_str não está vazio aqui, é uma situação estranha.
+            # No entanto, a condição acima (len(current_number_str) > 0 && ...) deve ter processado o número.
+            # Se chegamos aqui com current_number_str não vazio, é um erro de lógica.
+            # A condição mais segura é que current_number_str deve estar vazio para pegar um novo operador.
+             return "INVALIDO: Formato de expressão inválido próximo a " + char_op_check
+        }
+
+      } else {
+        # Se não é um dígito, nem ponto válido, nem operador conhecido, E não é espaço (já tratado)
+        if (char_op_check != "." || (char_op_check == "." && has_decimal_point)) { # Ponto inválido ou já tem um
+             if (!isnum(char_op_check)) { # Garante que não é um número que falhou em ser pego acima
+                return "INVALIDO: Caractere inesperado '" + char_op_check + "'"
+             }
+        }
+      }
       index = index + 1
     }
   }
+  # Processar qualquer número final que possa ter sido formado
+  if (len(current_number_str) > 0) {
+      valor_num: number = to_number(current_number_str)
+      # print("Processando valor final:", valor_num, "com operador:", operator) # Debug
+      if(operator == "+"){ result = result + valor_num }
+      else{ if(operator == "-"){ result = result - valor_num }
+      else{ if(operator == "*"){ result = result * valor_num }
+      else{ if(operator == "/"){
+              if (valor_num == 0) { return "INVALIDO: Divisão por zero" }
+              result = result / valor_num
+            }
+      else{ return "INVALIDO: Operador desconhecido final '" + operator + "'" }}}}
+  }
+
+  # print("Resultado final:", result) # Debug
   return to_string(result)
 }
 
@@ -36,3 +109,10 @@ description: string = "CALCULADORA SIMPLES"
 host_address: string = "127.0.0.1"
 
 c_channel calc description host_address
+print("Servidor Calculadora Minipar iniciado em", host_address, "porta 8585")
+print("Handler:", description)
+
+# Para manter o servidor rodando (Minipar pode sair após o script principal)
+while(true){
+ sleep(10)
+}

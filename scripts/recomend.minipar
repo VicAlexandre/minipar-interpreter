@@ -1,0 +1,349 @@
+# --- Definições Globais de Produtos e Helpers ---
+
+# Número total de produtos únicos. Ajuste se a lista de produtos mudar.
+func get_total_products_count() -> number {
+  return 16
+}
+
+# Mapeamento manual de índice para nome de produto
+func get_product_name_from_index(idx: number) -> string {
+  if (idx == 0) { return "Smartphone" }
+  if (idx == 1) { return "Laptop" }
+  if (idx == 2) { return "Tablet" }
+  if (idx == 3) { return "Fones de ouvido" }
+  if (idx == 4) { return "Camisa" }
+  if (idx == 5) { return "Jeans" }
+  if (idx == 6) { return "Jaqueta" }
+  if (idx == 7) { return "Sapatos" }
+  if (idx == 8) { return "Geladeira" }
+  if (idx == 9) { return "Micro-ondas" }
+  if (idx == 10) { return "Máquina de lavar" }
+  if (idx == 11) { return "Ar condicionado" }
+  if (idx == 12) { return "Ficção" }
+  if (idx == 13) { return "Não-ficção" }
+  if (idx == 14) { return "Ficção científica" }
+  if (idx == 15) { return "Fantasia" }
+  print("Erro: Índice de produto desconhecido:", idx)
+  return "DESCONHECIDO"
+}
+
+# Mapeamento manual de nome de produto para índice
+func get_product_index_from_name(product_name: string) -> number {
+  i_map: number = 0
+  total_prods: number = get_total_products_count()
+  while (i_map < total_prods) {
+    if (get_product_name_from_index(i_map) == product_name) {
+      return i_map
+    }
+    i_map = i_map + 1
+  }
+  return -1 # Não encontrado
+}
+
+# Histórico de compras do usuário (simulado com nomes, para uso interno em encode_purchase_history)
+# Esta função interna simula o user_purchase_history do Python.
+func get_user_purchase_item_name(item_idx: number) -> string {
+    if (item_idx == 0) { return "Smartphone" }
+    if (item_idx == 1) { return "Jeans" }
+    if (item_idx == 2) { return "Micro-ondas" }
+    if (item_idx == 3) { return "Ficção" }
+    return "" # Fim da lista simulada
+}
+func get_user_purchase_history_count() -> number { return 4 }
+
+
+# Função para codificar o histórico de compras do usuário
+func encode_user_purchase_history() -> array_number {
+  total_prods_enc: number = get_total_products_count()
+  
+  # Suposição: Criamos um array e o preenchemos.
+  # Se Minipar não tiver "make_array(size, defaultValue)", isso é um problema.
+  # Vamos declarar um array e preenchê-lo com um loop.
+  # Esta é uma limitação; idealmente, teríamos uma forma melhor de inicializar.
+  encoded_hist: array_number = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]; # Hardcoded para 16 produtos
+
+  # Verifica se o tamanho do array literal corresponde ao total de produtos
+  # (O programador Minipar deve garantir isso ao escrever o literal)
+  # if (len(encoded_hist) != total_prods_enc) {
+  #   print("Erro: Tamanho do array encoded_hist não corresponde ao total de produtos!")
+  #   # Retornar array vazio ou tratar erro
+  # }
+
+
+  # Preenche com zeros (o literal acima já faz isso, mas um loop seria mais geral se tivéssemos make_array)
+  # i_fill: number = 0
+  # while(i_fill < total_prods_enc) {
+  #   encoded_hist[i_fill] = 0
+  #   i_fill = i_fill + 1
+  # }
+
+  # Itera sobre o histórico de compras simulado
+  hist_idx: number = 0
+  max_hist_items: number = get_user_purchase_history_count()
+
+  while(hist_idx < max_hist_items) {
+    purchased_item_name: string = get_user_purchase_item_name(hist_idx)
+    if (len(purchased_item_name) > 0) { # Verifica se não é uma string vazia de sentinela
+        product_idx_enc: number = get_product_index_from_name(purchased_item_name)
+        if (product_idx_enc != -1) {
+            if (product_idx_enc < total_prods_enc) { # Checagem de segurança de índice
+                 encoded_hist[product_idx_enc] = 1
+            } else {
+                print("Aviso: Índice de produto fora dos limites durante encoding:", product_idx_enc)
+            }
+        }
+    }
+    hist_idx = hist_idx + 1
+  }
+  return encoded_hist
+}
+
+# --- Funções da Rede Neural ---
+
+# Helper para criar um array_number (vetor ou matriz achatada) preenchido com um valor
+# Esta é uma função HIPOTÉTICA que precisaria ser uma built-in ou escrita com literais.
+# Como built-in não existe, quem usar o script precisaria criar o array literal.
+# Para este script, as funções create_W1 etc. vão retornar literais de exemplo.
+func create_filled_array(size: number, fill_value: number) -> array_number {
+    # Em Minipar real, você teria que escrever o literal:
+    # if size == 2 { temp_arr: array_number = [fill_value, fill_value]; return temp_arr; }
+    # ... e assim por diante, o que não é prático.
+    # Esta função é um placeholder para a funcionalidade desejada.
+    print("AVISO: create_filled_array é um placeholder e retornará array pequeno.")
+    # Retornando um exemplo pequeno para a estrutura compilar, mas não funcional para a rede.
+    if (size == 10) { temp_arr_10: array_number = [fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value]; return temp_arr_10; }
+    if (size == 16) { temp_arr_16: array_number = [fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value,fill_value]; return temp_arr_16; }
+    if (size == 160) { print("Criando array de 160..."); temp_arr_160: array_number = []; i_f:number = 0; while(i_f < 160){ temp_arr_160 = temp_arr_160 + [fill_value]; i_f=i_f+1;}; return temp_arr_160;} # LENTO E RUIM!
+    
+    # Solução mais realista para Minipar seria o usuário escrever o array literal com todos os 0.5s.
+    # Ex: W1_data: array_number = [0.5, 0.5, .... (160 vezes)];
+    # Esta função não pode realmente criar um array dinâmico em Minipar puro.
+    dummy_arr: array_number = [fill_value]; # Retorno dummy
+    return dummy_arr;
+}
+
+
+# Funções para criar os pesos e biases.
+# Elas precisarão retornar arrays literais com os tamanhos corretos se não houver "make_array".
+func create_W1_matrix(input_s: number, hidden_s: number) -> array_number {
+  # W1 é input_s x hidden_s, achatada. Python: [[0.5 for _ in range(hidden_size)] for _ in range(input_size)]
+  # Para input_s=16, hidden_s=10, são 160 elementos.
+  # Esta função deveria retornar um array_number com 160 elementos, todos 0.5.
+  # Sem `make_array(160, 0.5)`, isso precisa ser um literal gigante.
+  # Vou usar o placeholder create_filled_array, mas isso é uma limitação.
+  print("Criando W1 (", input_s, "x", hidden_s, ")")
+  # return create_filled_array(input_s * hidden_s, 0.5) # Idealmente
+  
+  # Literal de exemplo para W1 (16x10 = 160 elementos) - MUITO LONGO PARA ESCREVER AQUI
+  # Apenas um exemplo funcional MUITO PEQUENO:
+  if (input_s == 16 && hidden_s == 10) {
+      # O usuário precisaria fornecer o array literal completo aqui.
+      # Para evitar um response gigante, vou retornar um array conceitualmente.
+      # Esta é a parte que o usuário Minipar precisa preencher com o array literal.
+      # print("Retornando W1 placeholder (deveria ser 16x10 de 0.5s)")
+      # W1_placeholder: array_number = []; # ... popular com 160 x 0.5
+      # return W1_placeholder; 
+      # Vou usar o create_filled_array que é um placeholder.
+      return create_filled_array(160, 0.5)
+  }
+  dummy_w1: array_number = [0.5, 0.5, 0.5, 0.5]; # Exemplo 2x2
+  return dummy_w1;
+}
+
+func create_b1_vector(hidden_s: number) -> array_number {
+  # b1 é hidden_s. Python: [0.5] * hidden_size
+  print("Criando b1 (", hidden_s, ")")
+  # return create_filled_array(hidden_s, 0.5) # Idealmente
+
+  if (hidden_s == 10) {
+      return create_filled_array(10, 0.5)
+      # b1_lit: array_number = [0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5];
+      # return b1_lit;
+  }
+  dummy_b1: array_number = [0.5, 0.5]; # Exemplo
+  return dummy_b1;
+}
+
+func create_W2_matrix(hidden_s: number, output_s: number) -> array_number {
+  # W2 é hidden_s x output_s. Python: [[0.5 for _ in range(output_size)] for _ in range(hidden_size)]
+  # Para hidden_s=10, output_s=16, são 160 elementos.
+  print("Criando W2 (", hidden_s, "x", output_s, ")")
+  # return create_filled_array(hidden_s * output_s, 0.5) # Idealmente
+  
+  if (hidden_s == 10 && output_s == 16) {
+      return create_filled_array(160, 0.5)
+  }
+  dummy_w2: array_number = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]; # Exemplo 2x3
+  return dummy_w2;
+}
+
+func create_b2_vector(output_s: number) -> array_number {
+  # b2 é output_s. Python: [0.5] * output_size
+  print("Criando b2 (", output_s, ")")
+  # return create_filled_array(output_s, 0.5) # Idealmente
+
+  if (output_s == 16) {
+      return create_filled_array(16, 0.5)
+      # b2_lit: array_number = [0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5];
+      # return b2_lit;
+  }
+  dummy_b2: array_number = [0.5, 0.5, 0.5]; # Exemplo
+  return dummy_b2;
+}
+
+
+# Função para ativação ReLU
+func relu_activation(x_vec: array_number) -> array_number {
+  len_relu: number = len(x_vec)
+  # result_relu: array_number = create_filled_array(len_relu, 0.0) # Idealmente
+  result_relu: array_number = x_vec; # Copia para modificar (Executor faz cópia na atribuição de array_number)
+  
+  i_relu: number = 0
+  while(i_relu < len_relu) {
+    val_r: number = x_vec[i_relu] # Lê da original (ou da cópia, se x_vec é cópia do parâmetro)
+    if (val_r < 0) {
+      result_relu[i_relu] = 0.0
+    } else {
+      result_relu[i_relu] = val_r
+    }
+    i_relu = i_relu + 1
+  }
+  return result_relu
+}
+
+# Função para ativação Sigmoid
+func sigmoid_activation(x_vec: array_number) -> array_number {
+  len_sig: number = len(x_vec)
+  # result_sig: array_number = create_filled_array(len_sig, 0.0) # Idealmente
+  result_sig: array_number = x_vec; # Copia para modificar
+
+  i_sig: number = 0
+  while(i_sig < len_sig) {
+    val_s: number = x_vec[i_sig]
+    result_sig[i_sig] = 1.0 / (1.0 + exp(-val_s))
+    i_sig = i_sig + 1
+  }
+  return result_sig
+}
+
+# Função para a propagação da rede neural
+func forward_propagation_nn(
+    X_nn: array_number, 
+    W1_nn: array_number, b1_nn: array_number, 
+    W2_nn: array_number, b2_nn: array_number, 
+    input_dim: number, hidden_dim: number, output_dim: number
+) -> array_number {
+
+  # Camada 1: Z1 = X_nn . W1_nn + b1_nn
+  # Z1_nn: array_number = create_filled_array(hidden_dim, 0.0) # Idealmente
+  # Usar b1_nn como base para o tamanho e depois preencher
+  Z1_nn: array_number = create_b1_vector(hidden_dim) # Garante o tamanho correto
+
+  idx_i: number = 0 # Neurônio na camada oculta (0 a hidden_dim-1)
+  while(idx_i < hidden_dim) {
+    sum_layer1: number = 0.0
+    idx_j: number = 0 # Feature de entrada (0 a input_dim-1)
+    while(idx_j < input_dim) {
+      # W1_nn é input_dim x hidden_dim, achatada: W1_nn[linha_j * num_cols_hidden + col_i]
+      sum_layer1 = sum_layer1 + (X_nn[idx_j] * W1_nn[idx_j * hidden_dim + idx_i])
+      idx_j = idx_j + 1
+    }
+    Z1_nn[idx_i] = sum_layer1 + b1_nn[idx_i]
+    idx_i = idx_i + 1
+  }
+  A1_nn: array_number = relu_activation(Z1_nn)
+
+  # Camada 2: Z2 = A1_nn . W2_nn + b2_nn
+  # Z2_nn: array_number = create_filled_array(output_dim, 0.0) # Idealmente
+  Z2_nn: array_number = create_b2_vector(output_dim) # Garante o tamanho correto
+
+  idx_k: number = 0 # Neurônio na camada de saída (0 a output_dim-1)
+  while(idx_k < output_dim) {
+    sum_layer2: number = 0.0
+    idx_l: number = 0 # Saída da camada oculta (0 a hidden_dim-1)
+    while(idx_l < hidden_dim) {
+      # W2_nn é hidden_dim x output_dim, achatada: W2_nn[linha_l * num_cols_output + col_k]
+      sum_layer2 = sum_layer2 + (A1_nn[idx_l] * W2_nn[idx_l * output_dim + idx_k])
+      idx_l = idx_l + 1
+    }
+    Z2_nn[idx_k] = sum_layer2 + b2_nn[idx_k]
+    idx_k = idx_k + 1
+  }
+  A2_nn: array_number = sigmoid_activation(Z2_nn)
+  return A2_nn
+}
+
+# Função principal para recomendar produtos
+func get_product_recommendations() -> void { # Modificado para void, apenas imprime
+  print("Codificando histórico de compras...")
+  encoded_history_rec: array_number = encode_user_purchase_history()
+  # print("Histórico codificado:", encoded_history_rec) # Debug
+
+  input_size_rec: number = len(encoded_history_rec)
+  hidden_size_rec: number = 10 
+  output_size_rec: number = len(encoded_history_rec) # Recomenda a partir de todos os produtos
+
+  if (input_size_rec == 0) {
+      print("Erro: Histórico codificado está vazio.")
+      return
+  }
+  
+  print("Criando rede neural (input:", input_size_rec, ", hidden:", hidden_size_rec, ", output:", output_size_rec,")")
+  # No Python: W1, b1, W2, b2 = create_neural_network(...)
+  # Em Minipar, chamamos individualmente:
+  W1_rec: array_number = create_W1_matrix(input_size_rec, hidden_size_rec)
+  b1_rec: array_number = create_b1_vector(hidden_size_rec)
+  W2_rec: array_number = create_W2_matrix(hidden_size_rec, output_size_rec)
+  b2_rec: array_number = create_b2_vector(output_size_rec)
+
+  # Checagem de tamanho (crucial se create_... retornam tamanhos fixos de exemplo)
+  # print("Tam W1:", len(W1_rec), "Esperado:", input_size_rec * hidden_size_rec)
+  # print("Tam b1:", len(b1_rec), "Esperado:", hidden_size_rec)
+  # print("Tam W2:", len(W2_rec), "Esperado:", hidden_size_rec * output_size_rec)
+  # print("Tam b2:", len(b2_rec), "Esperado:", output_size_rec)
+
+
+  print("Realizando propagação...")
+  recommendations_scores: array_number = forward_propagation_nn(
+      encoded_history_rec, W1_rec, b1_rec, W2_rec, b2_rec,
+      input_size_rec, hidden_size_rec, output_size_rec
+  )
+  # print("Scores de recomendação:", recommendations_scores) # Debug
+
+  print("Produtos recomendados para você:")
+  idx_final_rec: number = 0
+  total_prods_final: number = get_total_products_count()
+
+  while(idx_final_rec < total_prods_final) {
+    current_product_name: string = get_product_name_from_index(idx_final_rec)
+    
+    # Verifica se o produto já está no histórico de compras do usuário
+    is_purchased: bool = false
+    hist_item_idx: number = 0
+    max_hist_items_check: number = get_user_purchase_history_count()
+    while(hist_item_idx < max_hist_items_check) {
+        if (current_product_name == get_user_purchase_item_name(hist_item_idx)) {
+            is_purchased = true
+            break # Sai do loop interno
+        }
+        hist_item_idx = hist_item_idx + 1
+    }
+
+    # Recomenda se score > 0.5 e não foi comprado
+    if (idx_final_rec < len(recommendations_scores)) { # Checagem de segurança
+        if (recommendations_scores[idx_final_rec] > 0.5 && !is_purchased) {
+            print("- ", current_product_name, " (Score: ", recommendations_scores[idx_final_rec], ")")
+        }
+    } else {
+        print("Aviso: Índice fora dos limites para recommendations_scores.")
+    }
+    idx_final_rec = idx_final_rec + 1
+  }
+  # A função original Python retorna uma lista de strings.
+  # Esta versão Minipar imprime e retorna void.
+}
+
+# --- Execução Principal ---
+print("Iniciando sistema de recomendação de produtos em Minipar...")
+get_product_recommendations()
+print("Fim do sistema de recomendação.")
